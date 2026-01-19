@@ -2,7 +2,7 @@
 cp pet/bin/pet /usr/local/bin/.
 
 
-
+# remove old config
 rm -r ~/.config/pet
 cp -r pet/config/pet ~/.config/.
 
