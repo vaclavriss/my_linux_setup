@@ -1,0 +1,6 @@
+
+[[Snippets]]
+  Description = "Crop image - Command croppes the image using formula crop=width:height:w_start:h_start."
+  Output = ""
+  Tag = []
+  command = "ffmpeg -i input.png -vf crop=500:500:0:0 output.png"
