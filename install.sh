@@ -1,3 +1,5 @@
 # install pet
-cp pet/pet /usr/local/bin/.
+cp pet/bin/pet /usr/local/bin/.
+
+cp -r pet/config/pet ~/.config/pet.
 
