@@ -4,3 +4,15 @@
   Output = ""
   Tag = []
   command = "ffmpeg -i input.png -vf crop=500:500:0:0 output.png"
+
+[[Snippets]]
+  Description = "Get general file information - in case of images it will return size and coding."
+  Output = ""
+  Tag = []
+  command = "file image.png"
+
+[[Snippets]]
+  Description = "Change resolution of the image, scale=800:-1 will shrink images width to 800 and respects original ratio. Scale=1024x768 will change ratio of the image."
+  Output = ""
+  Tag = []
+  command = "ffmpeg -i input.png -vf scale=800:-1 output.png"
