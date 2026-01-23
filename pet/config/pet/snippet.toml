@@ -16,3 +16,15 @@
   Output = ""
   Tag = []
   command = "ffmpeg -i input.png -vf scale=800:-1 output.png"
+
+[[Snippets]]
+  Description = "Secure copy from local to remote"
+  Output = ""
+  Tag = []
+  command = "scp gurobi.lic mrs@gigabedna:/home/mrs/vaclav_ws/tsp/."
+
+[[Snippets]]
+  Description = "Tmux attaching to existing session."
+  Output = ""
+  Tag = []
+  command = "tmux a -t <NUMBER>"
