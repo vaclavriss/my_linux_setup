@@ -28,3 +28,57 @@
   Output = ""
   Tag = []
   command = "tmux a -t <NUMBER>"
+
+[[Snippets]]
+  Description = "Secure copy file from remote device to yours."
+  Output = ""
+  Tag = []
+  command = "scp mrs@gigabedna:/home/mrs/vaclav_ws/tsp/ktsp-pmm/python/tsp_result_b.txt /home/vaclav/."
+
+[[Snippets]]
+  Description = "Get information about image."
+  Output = ""
+  Tag = []
+  command = "ffprobe image.png"
+
+[[Snippets]]
+  Description = "Wireguard activation - VPN on"
+  Output = ""
+  Tag = []
+  command = "sudo wg-quick up wg0"
+
+[[Snippets]]
+  Description = "Wireguard deactivation - VPN off"
+  Output = ""
+  Tag = []
+  command = "wg-quick down wg0"
+
+[[Snippets]]
+  Description = "Compression of mp4 video. Adjustable parameter by number N=20-34. The larger the number, the more compressed video output is."
+  Output = ""
+  Tag = []
+  command = "ffmpeg -i input.mp4 -vcodec libx265 -crf 28 output.mp4"
+
+[[Snippets]]
+  Description = "Interface configuration - to get ip adresses, net masks. Optional parameter -a"
+  Output = ""
+  Tag = []
+  command = "ifconfig"
+
+[[Snippets]]
+  Description = "Internet configuration - dedicated to wireless networking interfaces"
+  Output = ""
+  Tag = []
+  command = "iwconfig"
+
+[[Snippets]]
+  Description = "Turn off the wifi"
+  Output = ""
+  Tag = []
+  command = "sudo ip link set wlan0 down"
+
+[[Snippets]]
+  Description = "Turn on the wifi"
+  Output = ""
+  Tag = []
+  command = "sudo ip link set wlan0 up"
