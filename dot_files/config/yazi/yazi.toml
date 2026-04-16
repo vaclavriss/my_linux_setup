@@ -1,0 +1,3 @@
+[manager]
+# Nastaví, co se zobrazuje na pravé straně řádku se souborem
+linemode = "permissions" # Zobrazí rwxr-xr-x

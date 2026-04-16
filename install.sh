@@ -1,118 +1,122 @@
-sudo apt update && sudo apt upgrade -y
- 
-# === zsh ===
+#!/bin/bash
 
-sudo apt install zsh 
-sudo apt install curl
+set -euo pipefail
+
+# Get the directory where this script is located
+REPO_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+DOTFILES_DIR="$REPO_DIR/dot_files"
+
+copy_file_if_exists() {
+	local src="$1"
+	local dst="$2"
+
+	if [[ -f "$src" ]]; then
+		mkdir -p "$(dirname "$dst")"
+		cp "$src" "$dst"
+	else
+		echo "ERROR: source file does not exist: $src" >&2
+	fi
+}
+
+copy_dir_if_exists() {
+	local src_dir="$1"
+	local dst_dir="$2"
+
+	if [[ -d "$src_dir" ]]; then
+		mkdir -p "$dst_dir"
+		cp -a "$src_dir"/. "$dst_dir"/
+	else
+		echo "ERROR: source directory does not exist: $src_dir" >&2
+	fi
+}
+
+sudo apt update && sudo apt upgrade -y
+
+# === Git, Wget, basic tools ===
+sudo apt install -y zsh git wget unzip curl
+
+# === zsh ===
 sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
-cd ~/.oh-my-zsh/custom/plugins
-git clone https://github.com/zsh-users/zsh-autosuggestions.git
-git clone https://github.com/zsh-users/zsh-syntax-highlighting.git
+mkdir -p "$HOME/.oh-my-zsh/custom/plugins"
+git clone https://github.com/zsh-users/zsh-autosuggestions.git "$HOME/.oh-my-zsh/custom/plugins/zsh-autosuggestions" || true
+git clone https://github.com/zsh-users/zsh-syntax-highlighting.git "$HOME/.oh-my-zsh/custom/plugins/zsh-syntax-highlighting" || true
+
+copy_file_if_exists "$DOTFILES_DIR/home/.zshrc" "$HOME/.zshrc"
+copy_file_if_exists "$DOTFILES_DIR/home/.zshenv" "$HOME/.zshenv"
+copy_file_if_exists "$DOTFILES_DIR/home/.p10k.zsh" "$HOME/.p10k.zsh"
+copy_file_if_exists "$DOTFILES_DIR/home/.bashrc" "$HOME/.bashrc"
 
 # === powerlevel10k ===
-
-mkdir -p ~/.local/share/fonts
-cd ~/.local/share/fonts
+mkdir -p "$HOME/.local/share/fonts"
+cd "$HOME/.local/share/fonts"
 wget https://github.com/romkatv/powerlevel10k-media/raw/master/MesloLGS%20NF%20Regular.ttf
 wget https://github.com/romkatv/powerlevel10k-media/raw/master/MesloLGS%20NF%20Bold.ttf
 wget https://github.com/romkatv/powerlevel10k-media/raw/master/MesloLGS%20NF%20Italic.ttf
 wget https://github.com/romkatv/powerlevel10k-media/raw/master/MesloLGS%20NF%20Bold%20Italic.ttf
 fc-cache -fv
 
-git clone --depth=1 https://github.com/romkatv/powerlevel10k.git ${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/themes/powerlevel10k
+git clone --depth=1 https://github.com/romkatv/powerlevel10k.git "${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/themes/powerlevel10k" || true
+cd "$HOME"
 
-# install dependecies
-sudo apt install fzf
-sudo apt install xclip
-sudo apt install xdotool
+# install dependencies
+sudo apt install -y fzf xclip xdotool
 
-# install pet
-sudo rm /usr/local/bin/pet
-sudo cp pet/bin/pet /usr/local/bin/.
+# === pet ===
+sudo install -m 755 "$REPO_DIR/pet/bin/pet" /usr/local/bin/pet
+copy_dir_if_exists "$DOTFILES_DIR/config/pet" "$HOME/.config/pet"
 
-# remove old and add new config
-rm -r ~/.config/pet
-mkdir ~/.config/pet
-cp  pet/config/config.toml  ~/.config/pet/.
-cp  pet/config/snippet.toml  ~/.config/pet/.
+# === SWAY + foot ===
+sudo apt install -y sway swaybg swayidle swaylock foot
+copy_dir_if_exists "$DOTFILES_DIR/config/sway" "$HOME/.config/sway"
+copy_dir_if_exists "$DOTFILES_DIR/assets/sway" "$HOME/.config/sway"
+copy_dir_if_exists "$DOTFILES_DIR/config/foot" "$HOME/.config/foot"
 
-# Add alias to .bashrc
-echo 'alias pc='pet searo "alias pc='pet search | xclip -selection clipboard && xdotool key Ctrl+Shift+V'" >> ~/.bashrc
+# === foot theme switcher ===
+mkdir -p "$HOME/.local/bin"
+copy_file_if_exists "$DOTFILES_DIR/local/bin/foot-theme-switch.sh" "$HOME/.local/bin/foot-theme-switch.sh"
+chmod +x "$HOME/.local/bin/foot-theme-switch.sh" 2>/dev/null || true
 
-# === SWAY ===
+# === nvim ===
+sudo apt install -y neovim
+copy_dir_if_exists "$DOTFILES_DIR/config/nvim" "$HOME/.config/nvim"
 
-sudo apt install sway
-sudo apt install swaybg
-sudo apt install swayidle
-sudo apt install swaylock
+if [[ -f "$DOTFILES_DIR/local/bin/tree-sitter" ]]; then
+	sudo install -m 755 "$DOTFILES_DIR/local/bin/tree-sitter" /usr/local/bin/tree-sitter
+fi
 
-sudo apt install foot
-
-# === foot theme switcher ===  
-
-cp utils/foot-theme-switch.sh ~/.local/bin/.
-
-# === NVIM ====
-
-# Important package to make nvim actually useful is tree-sitter
-# Troubleshooting github: https://github.com/nvim-lua/kickstart.nvim/pull/1657
-
-sudo apt install neovim
-
-# remove and paste new config
-rm -r ~/.config/nvim
-mkdir  ~/.config/nvim
-
-cp  nvim/config/init.lua  ~/.config/nvim/.
-
-sudo rm ~/.local/bin/tree-sitter 
-sudo cp neovim/bin/pet /usr/local/bin/.
-
-#  === git + ssh ===
-
-sudo apt install git
-sudo apt install ssh 
+# === git + ssh ===
+sudo apt install -y openssh-client
+copy_file_if_exists "$DOTFILES_DIR/home/.gitconfig" "$HOME/.gitconfig"
 
 # === tmux ===
-
-sudo apt install tmux
+sudo apt install -y tmux
+copy_file_if_exists "$DOTFILES_DIR/home/.tmux.conf" "$HOME/.tmux.conf"
 
 # === waybar + wifi TUI + bluetooth TUI ===
+sudo apt install -y waybar brightnessctl wev kitty
+copy_dir_if_exists "$DOTFILES_DIR/config/waybar" "$HOME/.config/waybar"
+copy_dir_if_exists "$DOTFILES_DIR/config/kitty" "$HOME/.config/kitty"
 
-sudo apt install waybar
-sudo apt install brightnessctl
-
-sudo apt instal wev
-sudo apt install kitty
-
-curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
-. "$HOME/.cargo/env"
-sudo apt install libdbus-1-dev pkg-config
+curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y && . "$HOME/.cargo/env"
+sudo apt install -y libdbus-1-dev pkg-config
 cargo install bluetui
 
 # === wofi ===
-
-sudo apt install wofi
+sudo apt install -y wofi
 
 # === yazi ===
-
 wget -qO yazi.zip https://github.com/sxyazi/yazi/releases/latest/download/yazi-x86_64-unknown-linux-gnu.zip
 unzip -q yazi.zip -d yazi-temp
 sudo mv yazi-temp/*/{ya,yazi} /usr/local/bin
 rm -rf yazi-temp yazi.zip
 
 # === yazi flavors ===
-git clone https://github.com/yazi-rs/flavors ~/.config/yazi/flavors
+mkdir -p "$HOME/.config/yazi"
+git clone https://github.com/yazi-rs/flavors "$HOME/.config/yazi/flavors" || true
+copy_dir_if_exists "$DOTFILES_DIR/config/yazi" "$HOME/.config/yazi"
 
-sudo apt install ffmpeg
-sudo apt install jq 
-sudo apt install poppler-utils
-sudo apt install fd-find 
-sudo apt install ripgrep
-sudo apt install fzf
+sudo apt install -y ffmpeg jq poppler-utils fd-find ripgrep
 
 # === htop ===
-
-sudo apt install htop
-
-# copy paste change of the visual mode
+sudo apt install -y htop
+copy_dir_if_exists "$DOTFILES_DIR/config/htop" "$HOME/.config/htop"
