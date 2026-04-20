@@ -40,13 +40,22 @@ output * bg ~/.config/sway/1920x1080-black-solid-color-background.jpg fill
 #
 # Example configuration:
 #
+
+# exec swayidle -w \
+#     timeout 300 'swaylock -f -c 000000' \
+#     timeout 600 'swaymsg "output * power off"' resume 'swaymsg "output * power on"' \
+#     before-sleep 'swaylock -f -c 000000'
+
 exec swayidle -w \
-         timeout 300 'swaylock -f -c 000000' \
-         timeout 600 'swaymsg "output * power off"' resume 'swaymsg "output * power on"' \
-         before-sleep 'swaylock -f -c 000000'
+    timeout 300 '~/.local/bin/lock-blur.sh' \
+    timeout 600 'swaymsg "output * power off"' resume 'swaymsg "output * power on"' \
+    before-sleep '~/.local/bin/lock-blur.sh' 
 
 # lock screen  by pressing mod + l
-bindsym Mod4+x exec swaylock -f -c 000000
+
+# bindsym Mod4+x exec swaylock -f -c 000000
+
+bindsym Mod4+x exec ~/.local/bin/lock-blur.sh
 
 # This will lock your screen after 300 seconds of inactivity, then turn off
 # your displays after another 300 seconds, and turn your screens back on when
@@ -231,6 +240,9 @@ gaps outer 5
 client.focused          #c3110c #280905 #740a03 #e97f4a #e97f4a
 client.focused_inactive #740a03 #280905 #740a03 #607b8f #607b8f
 client.unfocused        #740a03 #280905 #740a03 #740a03 #607B8F
+
+# Change second-extension display in CTU to 1.5
+output DP-3 scale 1.5
 
 include /etc/sway/config.d/*
 
