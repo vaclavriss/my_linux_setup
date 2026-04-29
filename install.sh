@@ -109,6 +109,9 @@ wget -qO yazi.zip https://github.com/sxyazi/yazi/releases/latest/download/yazi-x
 unzip -q yazi.zip -d yazi-temp
 sudo mv yazi-temp/*/{ya,yazi} /usr/local/bin
 rm -rf yazi-temp yazi.zip
+# === adding git to yazi ===
+ya pkg add yazi-rs/plugins:git
+ya pkg add llanosrocas/githead
 
 # === yazi flavors ===
 mkdir -p "$HOME/.config/yazi"
