@@ -1,0 +1,1 @@
+/home/vaclav/.bash_history

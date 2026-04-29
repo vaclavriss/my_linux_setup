@@ -1,0 +1,1 @@
+/home/vaclav/.p10k.zsh
