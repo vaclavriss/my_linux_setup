@@ -1,0 +1,181 @@
+@import "theme.css";
+/* active theme */
+
+@define-color workspace_background @background;
+@define-color workspace_active @foreground1;
+@define-color workspace_active_background @foreground2;
+@define-color workspace_urgent @white;
+@define-color workspace_urgent_background @brred;
+@define-color critical @brred;
+@define-color warning @bryellow;
+
+/* ─── Consistent spacing tokens ─────────────────────────────────────────── */
+/* Edit these two values and everything will stay in sync                    */
+/* Spacing reference (keep these values in sync manually):
+   --bar-margin:      4px   → vertical margin on bar modules
+   --bar-padding-x:   10px  → horizontal padding inside modules
+   --radius:          15px  → border radius for all pill shapes
+*/
+
+@keyframes blink {
+  to {
+    background-color: @black;
+    color: @foreground1;
+  }
+}
+
+/* ─── Reset ──────────────────────────────────────────────────────────────── */
+* {
+  border: none;
+  border-radius: 0;
+  font-family: "FiraCode Nerd Font", "FiraCode NF";
+  font-weight: 500;
+  font-size: 16px;
+  min-height: 0;
+}
+
+/* ─── Bar window ─────────────────────────────────────────────────────────── */
+window#waybar {
+  background: transparent;
+}
+
+/* ─── Tooltips ───────────────────────────────────────────────────────────── */
+tooltip {
+  background: @background;
+  /* opacity: 0.8; */
+  border-radius: 15px;
+}
+
+tooltip label {
+  color: @foreground1;
+}
+
+/* ─── Workspaces ─────────────────────────────────────────────────────────── */
+#workspaces {
+  background: @workspace_background;
+  opacity: 1;
+  transition: none;
+  padding: 4px 5px;
+  /* vertical matches bar-margin, horizontal is tight */
+  border-radius: 15px;
+  margin: 4px 0;
+  /* same vertical margin as all other modules */
+}
+
+#workspaces button,
+#workspaces button.empty {
+  background: transparent;
+  color: @fade;
+  border-radius: 15px;
+  padding: 0 6px;
+  /* min-width: 18px; */
+  transition: none;
+}
+
+/* #workspaces button.active { */
+/*   background: transparent; */
+/*   color: @foreground1; */
+/*   border-radius: 15px 15px 0 0; */
+/* } */
+
+#workspaces button.focused {
+  background: @workspace_active_background;
+  color: @workspace_active;
+  border-radius: 15px;
+}
+
+#workspaces button.urgent {
+  background: @workspace_urgent_background;
+  color: @workspace_urgent;
+  border-radius: 15px;
+  animation-name: blink;
+  animation-duration: 0.5s;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+}
+
+/* #workspaces button:not(.current_output) { */
+/*   opacity: 0.5; */
+/* } */
+
+/* ─── Taskbar ────────────────────────────────────────────────────────────── */
+#taskbar {
+  background: @background;
+  border-radius: 15px;
+  margin: 4px 10px;
+  padding: 0 10px;
+}
+
+/* ─── Clock (standalone pill) ────────────────────────────────────────────── */
+#clock, #language {
+  color: @foreground1;
+  background-color: @background;
+  border-radius: 15px;
+  padding: 0 10px;
+  /* same as module group */
+  margin: 4px 5px;
+  /* same vertical margin as module group */
+}
+
+/* ─── Grouped modules (pill row) ─────────────────────────────────────────── */
+#disk,
+#cpu,
+#memory,
+#wireplumber,
+#network,
+#bluetooth,
+#backlight,
+#battery {
+  background-color: @background;
+  color: @foreground1;
+  padding: 0 4px;
+  /* single definition — no more double declaration */
+  margin: 4px 0;
+  /* uniform vertical margin */
+  border-radius: 0;
+  /* middle segments are flat */
+}
+
+/* Round the left cap */
+#cpu {
+  padding: 0 6px;
+  border-radius: 15px 0 0 15px;
+}
+
+/* Round the right cap */
+#battery {
+  padding: 0 6px;
+  border-radius: 0 15px 15px 0;
+}
+
+/* ─── Battery states ─────────────────────────────────────────────────────── */
+#battery {
+  color: @green;
+}
+
+#battery.discharging {
+  color: @battery_discharge;
+}
+
+#battery.warning:not(.charging) {
+  background: @warning;
+  color: @black;
+  /* ensure contrast on yellow background */
+  animation-name: blink;
+  animation-duration: 0.5s;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+}
+
+#battery.critical:not(.charging) {
+  background-color: @critical;
+  color: @foreground1;
+  /* ensure contrast on red background */
+  animation-name: blink;
+  animation-duration: 0.5s;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  animation-direction: alternate;
+}
