@@ -1,0 +1,3 @@
+2026/05/03-21:24:28.607 14fd70 Reusing MANIFEST /home/vaclav/.config/Foxglove/IndexedDB/file__0.indexeddb.leveldb/MANIFEST-000001
+2026/05/03-21:24:28.607 14fd70 Recovering log #3
+2026/05/03-21:24:28.608 14fd70 Reusing old log /home/vaclav/.config/Foxglove/IndexedDB/file__0.indexeddb.leveldb/000003.log 

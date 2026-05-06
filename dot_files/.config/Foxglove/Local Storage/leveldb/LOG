@@ -1,0 +1,39 @@
+2026/05/03-21:24:27.625 14fd73 Reusing MANIFEST /home/vaclav/.config/Foxglove/Local Storage/leveldb/MANIFEST-000001
+2026/05/03-21:24:27.626 14fd73 Recovering log #28
+2026/05/03-21:24:27.627 14fd73 Reusing old log /home/vaclav/.config/Foxglove/Local Storage/leveldb/000028.log 
+2026/05/03-21:25:27.631 14fd73 Level-0 table #32: started
+2026/05/03-21:25:27.633 14fd73 Level-0 table #32: 20636 bytes OK
+2026/05/03-21:25:27.635 14fd73 Delete type=0 #28
+2026/05/03-21:28:28.269 14fd73 Level-0 table #34: started
+2026/05/03-21:28:28.272 14fd73 Level-0 table #34: 20541 bytes OK
+2026/05/03-21:28:28.274 14fd73 Delete type=0 #31
+2026/05/03-21:28:28.275 14fd73 Compacting 4@0 + 1@1 files
+2026/05/03-21:28:28.277 14fd73 Generated table #35@0: 9 keys, 7377 bytes
+2026/05/03-21:28:28.277 14fd73 Compacted 4@0 + 1@1 files => 7377 bytes
+2026/05/03-21:28:28.279 14fd73 compacted to: files[ 0 1 1 0 0 0 0 ]
+2026/05/03-21:28:28.279 14fd73 Delete type=2 #27
+2026/05/03-21:28:28.279 14fd73 Delete type=2 #34
+2026/05/03-21:28:28.279 14fd73 Delete type=2 #32
+2026/05/03-21:28:28.279 14fd73 Delete type=2 #25
+2026/05/03-21:28:28.279 14fd73 Delete type=2 #29
+2026/05/03-21:31:28.269 14fd73 Level-0 table #37: started
+2026/05/03-21:31:28.273 14fd73 Level-0 table #37: 20290 bytes OK
+2026/05/03-21:31:28.275 14fd73 Delete type=0 #33
+2026/05/04-09:24:00.378 14fd73 Level-0 table #39: started
+2026/05/04-09:24:00.382 14fd73 Level-0 table #39: 20444 bytes OK
+2026/05/04-09:24:00.384 14fd73 Delete type=0 #36
+2026/05/04-09:27:00.378 14fd70 Level-0 table #41: started
+2026/05/04-09:27:00.381 14fd70 Level-0 table #41: 20688 bytes OK
+2026/05/04-09:27:00.384 14fd70 Delete type=0 #38
+2026/05/04-09:40:00.377 14fd73 Level-0 table #43: started
+2026/05/04-09:40:00.381 14fd73 Level-0 table #43: 21111 bytes OK
+2026/05/04-09:40:00.383 14fd73 Delete type=0 #40
+2026/05/04-09:40:00.383 14fd73 Compacting 4@0 + 1@1 files
+2026/05/04-09:40:00.385 14fd73 Generated table #44@0: 9 keys, 7489 bytes
+2026/05/04-09:40:00.386 14fd73 Compacted 4@0 + 1@1 files => 7489 bytes
+2026/05/04-09:40:00.387 14fd73 compacted to: files[ 0 1 1 0 0 0 0 ]
+2026/05/04-09:40:00.388 14fd73 Delete type=2 #35
+2026/05/04-09:40:00.388 14fd73 Delete type=2 #37
+2026/05/04-09:40:00.388 14fd73 Delete type=2 #43
+2026/05/04-09:40:00.388 14fd73 Delete type=2 #41
+2026/05/04-09:40:00.388 14fd73 Delete type=2 #39
