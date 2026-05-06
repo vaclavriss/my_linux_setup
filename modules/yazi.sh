@@ -1,33 +1,37 @@
-#!/usr/bin/env bash
-
-# yazi (binary release)
+#!/bin/bash
+# Exit immediately if a command exits with a non-zero status, treat unset variables as an error, and fail on pipeline errors
 set -euo pipefail
-# Get module dir and source common helpers
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-# shellcheck source=/dev/null
-source "$SCRIPT_DIR/common.sh"
 
-tmpzip="$(mktemp -u)/yazi.zip"
-wget -qO "$tmpzip" https://github.com/sxyazi/yazi/releases/latest/download/yazi-x86_64-unknown-linux-gnu.zip || true
-if [[ -f "$tmpzip" ]]; then
-    tmpdir=$(mktemp -d)
-    unzip -q "$tmpzip" -d "$tmpdir" || true
-    sudo mv "$tmpdir"/*/{ya,yazi} /usr/local/bin 2>/dev/null || true
-    rm -rf "$tmpdir" "$tmpzip" || true
-fi
+echo "1/5 Updating repositories and installing recommended dependencies..."
+sudo apt update
+sudo apt install -y curl wget unzip jq poppler-utils fd-find ripgrep fzf zoxide imagemagick ffmpegthumbnailer 7zip git
 
-# yazi flavors and config
+echo "2/5 Downloading the latest version of Yazi from GitHub..."
+TMP_DIR=$(mktemp -d)
+cd "$TMP_DIR"
+
+URL="https://github.com/sxyazi/yazi/releases/latest/download/yazi-x86_64-unknown-linux-gnu.zip"
+# The -f flag ensures curl fails (and halts the script) on server errors, e.g., if the URL is not found
+curl -fsSL -o yazi.zip "$URL"
+
+echo "3/5 Extracting and installing to /usr/local/bin (sudo password may be required)..."
+unzip -q yazi.zip
+cd yazi-x86_64-unknown-linux-gnu
+
+sudo cp yazi ya /usr/local/bin/
+sudo chmod +x /usr/local/bin/yazi /usr/local/bin/ya
+
+echo "4/5 Configuring themes (Flavors)..."
 mkdir -p "$HOME/.config/yazi"
-TARGET="$HOME/.config/yazi/flavors"
-if [[ -d "$TARGET/.git" ]]; then
-    echo "Updating existing flavors repo at $TARGET"
-    git -C "$TARGET" pull --ff-only || git -C "$TARGET" pull --rebase || true
-elif [[ -d "$TARGET" ]]; then
-    echo "Removing non-git existing flavors at $TARGET and re-cloning"
-    rm -rf "$TARGET"
-    git clone https://github.com/yazi-rs/flavors "$TARGET" || true
+if [ ! -d "$HOME/.config/yazi/flavors/.git" ]; then
+    echo "   -> Downloading new themes..."
+    git clone https://github.com/yazi-rs/flavors "$HOME/.config/yazi/flavors"
 else
-    git clone https://github.com/yazi-rs/flavors "$TARGET" || true
+    echo "   -> Themes already exist, performing an update..."
+    cd "$HOME/.config/yazi/flavors" && git pull origin main
 fi
 
-copy_dir_if_exists "$DOTFILES_DIR/.config/yazi" "$HOME/.config/yazi"
+echo "5/5 Cleaning up temporary files..."
+rm -rf "$TMP_DIR"
+
+echo "Yazi installation completed successfully! You can start it by typing: yazi"
