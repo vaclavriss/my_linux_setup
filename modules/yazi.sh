@@ -31,7 +31,13 @@ else
     cd "$HOME/.config/yazi/flavors" && git pull origin main
 fi
 
+# Refresh Yazi's package index to ensure the new themes are recognized 
+TARGET="jmeno-balicku"; LINE=$(grep -n "$TARGET" ~/.config/yazi/package.toml | head -n 1 | cut -d: -f1) && [ -n "$LINE" ] && sed -i "$((LINE>1?LINE-1:1)),$((LINE+3))d" ~/.config/yazi/package.toml && ya pack -i
+
+# Install the "claude-inspired" theme package
+ya pkg add rapidrabbit76/claude-inspired
+
 echo "5/5 Cleaning up temporary files..."
 rm -rf "$TMP_DIR"
 
-echo "Yazi installation completed successfully! You can start it by typing: yazi"
+echo "Yazi installation completed. Check installation by running 'yazi --version' or 'ya --version'."
