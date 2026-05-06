@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+set -euo pipefail
+# Get module dir and source common helpers
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
+source "$SCRIPT_DIR/common.sh"
+
 # zsh, oh-my-zsh, plugins, dotfiles, powerlevel10k fonts
 
 sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" || true

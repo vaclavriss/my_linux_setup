@@ -1,4 +1,11 @@
 # yazi (binary release)
+#!/usr/bin/env bash
+set -euo pipefail
+# Get module dir and source common helpers
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
+source "$SCRIPT_DIR/common.sh"
+
 tmpzip="$(mktemp -u)/yazi.zip"
 wget -qO "$tmpzip" https://github.com/sxyazi/yazi/releases/latest/download/yazi-x86_64-unknown-linux-gnu.zip || true
 if [[ -f "$tmpzip" ]]; then

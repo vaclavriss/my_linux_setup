@@ -1,4 +1,10 @@
 #!/usr/bin/env bash
+set -euo pipefail
+# Get module dir and source common helpers
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# shellcheck source=/dev/null
+source "$SCRIPT_DIR/common.sh"
+
 # Sway, foot and related configs + helper scripts
 
 sudo apt install -y sway swaybg swayidle swaylock foot || true
