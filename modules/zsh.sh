@@ -9,7 +9,6 @@ git clone https://github.com/zsh-users/zsh-syntax-highlighting.git "$HOME/.oh-my
 copy_file_if_exists "$DOTFILES_DIR/.zshrc" "$HOME/.zshrc"
 copy_file_if_exists "$DOTFILES_DIR/.zshenv" "$HOME/.zshenv"
 copy_file_if_exists "$DOTFILES_DIR/.p10k.zsh" "$HOME/.p10k.zsh"
-copy_file_if_exists "$DOTFILES_DIR/.bashrc" "$HOME/.bashrc"
 
 # powerlevel10k fonts + theme
 mkdir -p "$HOME/.local/share/fonts"

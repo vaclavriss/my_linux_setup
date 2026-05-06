@@ -86,7 +86,7 @@ fi
 if [[ -r "$MODULE_DIR/sway.sh" ]]; then
 	echo "---- Running module: sway.sh ----"
 	# shellcheck source=/dev/null
-	source "$MODULE_DIR/sway.sh"
+	source "$MODULE_DIR/sway-waybar-wofi.sh"
 else
 	echo "Skipping missing module: sway.sh" >&2
 fi
