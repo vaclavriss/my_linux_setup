@@ -1,0 +1,63 @@
+2026/06/03-17:49:37.237 364c7 Reusing MANIFEST /home/vaclav/.config/Foxglove Studio/Local Storage/leveldb/MANIFEST-000001
+2026/06/03-17:49:37.237 364c7 Recovering log #45
+2026/06/03-17:49:37.237 364c7 Reusing old log /home/vaclav/.config/Foxglove Studio/Local Storage/leveldb/000045.log 
+2026/06/03-17:50:37.240 3649d Level-0 table #49: started
+2026/06/03-17:50:37.243 3649d Level-0 table #49: 22279 bytes OK
+2026/06/03-17:50:37.247 3649d Delete type=0 #45
+2026/06/03-17:50:37.247 3649d Compacting 4@0 + 1@1 files
+2026/06/03-17:50:37.249 3649d Generated table #50@0: 8 keys, 7715 bytes
+2026/06/03-17:50:37.249 3649d Compacted 4@0 + 1@1 files => 7715 bytes
+2026/06/03-17:50:37.252 3649d compacted to: files[ 0 1 1 0 0 0 0 ]
+2026/06/03-17:50:37.252 3649d Delete type=2 #49
+2026/06/03-17:50:37.252 3649d Delete type=2 #37
+2026/06/03-17:50:37.252 3649d Delete type=2 #43
+2026/06/03-17:50:37.252 3649d Delete type=2 #40
+2026/06/03-17:50:37.252 3649d Delete type=2 #46
+2026/06/03-17:54:37.827 3649d Level-0 table #52: started
+2026/06/03-17:54:37.832 3649d Level-0 table #52: 22508 bytes OK
+2026/06/03-17:54:37.835 3649d Delete type=0 #48
+2026/06/03-17:57:37.828 3649a Level-0 table #54: started
+2026/06/03-17:57:37.832 3649a Level-0 table #54: 22197 bytes OK
+2026/06/03-17:57:37.836 3649a Delete type=0 #51
+2026/06/03-19:28:37.829 3649a Level-0 table #56: started
+2026/06/03-19:28:37.833 3649a Level-0 table #56: 13212 bytes OK
+2026/06/03-19:28:37.835 3649a Delete type=0 #53
+2026/06/03-21:59:37.827 3649a Level-0 table #58: started
+2026/06/03-21:59:37.831 3649a Level-0 table #58: 9784 bytes OK
+2026/06/03-21:59:37.834 3649a Delete type=0 #55
+2026/06/03-21:59:37.835 3649a Compacting 4@0 + 1@1 files
+2026/06/03-21:59:37.839 3649a Generated table #59@0: 8 keys, 7880 bytes
+2026/06/03-21:59:37.839 3649a Compacted 4@0 + 1@1 files => 7880 bytes
+2026/06/03-21:59:37.841 3649a compacted to: files[ 0 1 1 0 0 0 0 ]
+2026/06/03-21:59:37.841 3649a Delete type=2 #50
+2026/06/03-21:59:37.841 3649a Delete type=2 #52
+2026/06/03-21:59:37.841 3649a Delete type=2 #56
+2026/06/03-21:59:37.841 3649a Delete type=2 #58
+2026/06/03-21:59:37.841 3649a Delete type=2 #54
+2026/06/03-23:26:37.828 3649d Level-0 table #61: started
+2026/06/03-23:26:37.856 3649d Level-0 table #61: 20547 bytes OK
+2026/06/03-23:26:37.858 3649d Delete type=0 #57
+2026/06/04-01:57:37.828 3649a Level-0 table #63: started
+2026/06/04-01:57:37.831 3649a Level-0 table #63: 9848 bytes OK
+2026/06/04-01:57:37.833 3649a Delete type=0 #60
+2026/06/04-04:28:37.827 3649a Level-0 table #65: started
+2026/06/04-04:28:37.853 3649a Level-0 table #65: 9697 bytes OK
+2026/06/04-04:28:37.856 3649a Delete type=0 #62
+2026/06/04-06:59:37.854 3649d Level-0 table #67: started
+2026/06/04-06:59:37.856 3649d Level-0 table #67: 9803 bytes OK
+2026/06/04-06:59:37.859 3649d Delete type=0 #64
+2026/06/04-06:59:37.860 3649d Compacting 4@0 + 1@1 files
+2026/06/04-06:59:37.863 3649d Generated table #68@0: 8 keys, 7975 bytes
+2026/06/04-06:59:37.863 3649d Compacted 4@0 + 1@1 files => 7975 bytes
+2026/06/04-06:59:37.865 3649d compacted to: files[ 0 1 1 0 0 0 0 ]
+2026/06/04-06:59:37.865 3649d Delete type=2 #65
+2026/06/04-06:59:37.865 3649d Delete type=2 #59
+2026/06/04-06:59:37.865 3649d Delete type=2 #61
+2026/06/04-06:59:37.866 3649d Delete type=2 #67
+2026/06/04-06:59:37.866 3649d Delete type=2 #63
+2026/06/04-08:57:40.780 3649d Level-0 table #70: started
+2026/06/04-08:57:40.782 3649d Level-0 table #70: 14958 bytes OK
+2026/06/04-08:57:40.784 3649d Delete type=0 #66
+2026/06/04-10:14:41.263 3649d Level-0 table #72: started
+2026/06/04-10:14:41.269 3649d Level-0 table #72: 19876 bytes OK
+2026/06/04-10:14:41.272 3649d Delete type=0 #69

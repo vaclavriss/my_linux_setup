@@ -167,8 +167,8 @@
   },
 
   "network": {
-    "format-wifi": "  {ipaddr}",   // Wi-Fi
-    "format-ethernet": "  {ipaddr}",               // Wired/Ethernet
+    "format-wifi": "  {ipaddr} {essid}",   // Wi-Fi
+    "format-ethernet": "  {ipaddr} {essid}",               // Wired/Ethernet
     "format-disconnected": " ", //An empty format will hide the module.
     "on-click": "foot -e nmtui",             // opens network manager GUI
     "tooltip": true,
@@ -177,7 +177,7 @@
     // "format-ethernet": "󰈀 {ifname}",
     // "format-disconnected": " ", //An empty format will hide the module.
     // "format-linked": "{ifname}",
-    // "format-vpn": "󰦝  VPN Active", // Icon shows when a VPN interface is up
+    "format-vpn": "󰦝  VPN Active", // Icon shows when a VPN interface is up
     // "tooltip-format": "󰈀 {ifname} {gwaddr}",
     "tooltip-format-wifi": "  {signalStrength}% {essid} {ipaddr}",
     "tooltip-format-ethernet": "  {ifname} {ipaddr}/{cidr}",

@@ -142,3 +142,9 @@
   Output = ""
   Tag = []
   command = "wf-recorder -g 915,287 282x139 -f vyrez.mp4"
+
+[[Snippets]]
+  Description = "Network manager disable operating with ethernet configuration - mandatory step before configuring ethernet connection via ifconfig."
+  Output = ""
+  Tag = []
+  command = "sudo nmcli device set enp0s31f6 managed no"

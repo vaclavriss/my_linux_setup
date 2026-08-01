@@ -1,0 +1,4 @@
+[Bookmarks]
+[Recent]
+/home/vaclav/Downloads/
+/home/vaclav/git/summer-school-2025-imported-repo/mrim_task/mrim_resources/blender_files/

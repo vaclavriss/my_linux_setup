@@ -46,10 +46,10 @@ output * bg ~/.config/sway/1920x1080-black-solid-color-background.jpg fill
 #     timeout 600 'swaymsg "output * power off"' resume 'swaymsg "output * power on"' \
 #     before-sleep 'swaylock -f -c 000000'
 
-exec swayidle -w \
-    timeout 300 '~/.local/bin/lock-blur.sh' \
-    timeout 600 'swaymsg "output * power off"' resume 'swaymsg "output * power on"' \
-    before-sleep '~/.local/bin/lock-blur.sh' 
+# exec swayidle -w \
+#     timeout 60000 '~/.local/bin/lock-blur.sh' \
+#     timeout 70000 'swaymsg "output * power off"' resume 'swaymsg "output * power on"' \
+#     before-sleep '~/.local/bin/lock-blur.sh' 
 
 # lock screen  by pressing mod + l
 
@@ -254,6 +254,6 @@ bindsym $mod+q exec env AUTO_YAZI=1 $term
 include /etc/sway/config.d/*
 
 
-
+seat * xcursor_theme Yaru 24
 
 # exec foot -e tmux

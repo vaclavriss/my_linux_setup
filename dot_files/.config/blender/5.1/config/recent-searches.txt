@@ -1,0 +1,6 @@
+Input ▸ Scene ▸ Collection Info
+   Collection 2
+Geometry ▸ Sample ▸ Geometry Proximity
+Geometry ▸ Operations ▸ Delete Geometry
+Utilities ▸ Math ▸ Compare
+L  Material|[essentials_brushes-mesh_texture.blend]

@@ -220,9 +220,13 @@ alias sz="source ~/.zshrc"
 alias sm="bash ~/.local/bin/foot-theme-switch.sh"
 alias e="exit"
 alias z="nvim ~/.zshrc"
+alias t="bash /home/vaclav/git/Edge-Teams-Container/run.sh"
+
 alias cb="colcon build"
 
 alias s="nvim ~/.config/sway/config"
+alias s4="cd ~/git/ss-26-internal/internal/04_uav_system_start/"
+alias s5="cd ~/git/ss-26-internal/internal/05_mrim_task/"
 
 # Created by `pipx` on 2026-04-17 12:42:11
 export PATH="$PATH:/home/vaclav/.local/bin"

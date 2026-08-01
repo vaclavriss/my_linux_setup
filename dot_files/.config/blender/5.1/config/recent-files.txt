@@ -1,0 +1,8 @@
+/home/vaclav/Downloads/wip_large.blend
+/home/vaclav/Downloads/apocalypse_large_compressed.blend
+/home/vaclav/Downloads/wip_small.blend
+/home/vaclav/Downloads/wip4.blend
+/home/vaclav/Downloads/wip_moderate.blend
+/home/vaclav/Downloads/wip3.blend
+/home/vaclav/Downloads/wip2.blend
+/home/vaclav/Downloads/wip.blend
