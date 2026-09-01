@@ -32,7 +32,9 @@ else
 fi
 
 # Refresh Yazi's package index to ensure the new themes are recognized 
-TARGET="jmeno-balicku"; LINE=$(grep -n "$TARGET" ~/.config/yazi/package.toml | head -n 1 | cut -d: -f1) && [ -n "$LINE" ] && sed -i "$((LINE>1?LINE-1:1)),$((LINE+3))d" ~/.config/yazi/package.toml && ya pack -i
+TARGET="claude-inspired"; LINE=$(grep -n "$TARGET" ~/.config/yazi/package.toml | head -n 1 | cut -d: -f1) && [ -n "$LINE" ] && sed -i "$((LINE>1?LINE-1:1)),$((LINE+3))d" ~/.config/yazi/package.toml #&& ya pack -i
+
+# Please check file ~/.config/yazi/theme.toml - That ensures right theme in terminal.
 
 # Install the "claude-inspired" theme package
 ya pkg add rapidrabbit76/claude-inspired

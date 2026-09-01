@@ -5,6 +5,8 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=/dev/null
 source "$SCRIPT_DIR/common.sh"
 
+sudo apt install gcc
+
 # Neovim and optional tree-sitter from local repo
 
 sudo apt install -y neovim || true
