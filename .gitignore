@@ -1,3 +1,4 @@
 # Directory to be ignored
 dot_files/.config/Code/
 Foxglove/
+dot_files/.config/Foxglove Studio/

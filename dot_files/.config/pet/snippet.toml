@@ -148,3 +148,9 @@
   Output = ""
   Tag = []
   command = "sudo nmcli device set enp0s31f6 managed no"
+
+[[Snippets]]
+  Description = "TMUX sessions check over ALL sockets - tmux ls does not see all sessions, just the default... so check always if non-default exists."
+  Output = ""
+  Tag = []
+  command = "ls -la /tmp/tmux-1000/"

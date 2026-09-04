@@ -120,79 +120,9 @@ export EDITOR='nvim'
 export LS_COLORS='di=1;38;2;230;80;27:fi=1;38;2;233;127;74'
 export LS_COLORS='di=1;38;2;230;80;27:fi=1;38;2;247;227;150'
 
-# source ROS 2 jazzy
-source /opt/ros/jazzy/setup.zsh
 
 # WARN and ERROR colours 
 export RCUTILS_COLORIZED_OUTPUT=1
-
-roscd() {
-  # Bezpečnější kontrola s uvozovkami
-  if [ -n "$COLCON_PREFIX_PATH" ]; then
-    if [ -z "$1" ]; then
-      cd "$COLCON_PREFIX_PATH/../src" || return 1
-      return 0
-    fi
-    # Nejprve zkusit najít balíček v aktuálním workspace
-    local package_path
-    package_path=$(
-      colcon list --base-paths "$COLCON_PREFIX_PATH/.." 2>/dev/null | \
-      grep -E "^$1\s" | awk '{print $2}'
-    )
-    if [ -n "$package_path" ]; then
-      cd "$package_path" || return 1
-      return 0
-    fi
-  fi
-
-  if [ -z "$1" ]; then
-    cd /opt/ros/jazzy/share || return 1
-    return 0
-  fi
-
-  # Poté zkusit najít balíček mezi nainstalovanými
-  local package_path
-  package_path=$(ros2 pkg prefix --share "$1" 2> /dev/null)
-  if [ -n "$package_path" ]; then
-    cd "$package_path" || return 1
-    return 0
-  fi
-
-  # Pokud nic nevyjde, skoč do workspace src (pokud existuje)
-  if [ -n "$COLCON_PREFIX_PATH" ]; then
-    cd "$COLCON_PREFIX_PATH/../src" || return 1
-  fi
-}
-
-_roscd_complete() {
-  local current_word="${COMP_WORDS[COMP_CWORD]}"
-  local packages=""
-
-  # Získání lokálních balíčků přes colcon (jen pokud jsme ve workspace)
-  if [ -n "$COLCON_PREFIX_PATH" ]; then
-    packages=$(colcon list --base-paths "$COLCON_PREFIX_PATH/.." 2>/dev/null | awk '{print $1}')
-  fi
-
-  # Rychlé získání systémových balíčků (mnohem rychlejší než 'ros2 pkg list')
-  local installed_pkgs
-  if [ -d "/opt/ros/jazzy/share" ]; then
-    installed_pkgs=$(ls /opt/ros/jazzy/share 2>/dev/null)
-    packages="$packages $installed_pkgs"
-  else
-    # Fallback, pokud z nějakého důvodu složka neexistuje
-    packages="$packages $(ros2 pkg list 2>/dev/null)"
-  fi
-
-  # Vytvoření nabídky pro autocompletion
-  COMPREPLY=($(compgen -W "$packages" -- "$current_word"))
-}
-
-# Inicializace kompatibility, pokud náhodou používáš Zsh
-if [ -n "$ZSH_VERSION" ]; then
-  autoload -U +X bashcompinit && bashcompinit
-fi
-
-complete -F _roscd_complete roscd
 
 # Directories and regular files
 export LS_COLORS='di=1;38;2;233;127;74:'  # directory
@@ -221,94 +151,22 @@ alias sm="bash ~/.local/bin/foot-theme-switch.sh"
 alias e="exit"
 alias z="nvim ~/.zshrc"
 alias t="bash /home/vaclav/git/Edge-Teams-Container/run.sh"
-
+alias cc="cd $ROS_WORKSPACE && rm -rf install build log"
 alias cb="colcon build"
 
 alias s="nvim ~/.config/sway/config"
-alias s4="cd ~/git/ss-26-internal/internal/04_uav_system_start/"
-alias s5="cd ~/git/ss-26-internal/internal/05_mrim_task/"
 
 # Created by `pipx` on 2026-04-17 12:42:11
 export PATH="$PATH:/home/vaclav/.local/bin"
 
 # ROS 2 my workspace
-
 source /home/vaclav/ros2_ws/install/setup.zsh
 
 export ROS_WORKSPACE=/home/vaclav/ros2_ws/
-export ACADOS_SOURCE_DIR=~/git/acados
-export ACADOS_PYTHON_BIN=~/.venv/acados
+export ACADOS_SOURCE_DIR=/home/vaclav/git/acados
+export ACADOS_VENV_DIR=/home/vaclav/.venv/acados_new # Python virtual environment directory (e.g., `~/.venv/acados`)
 
-roscd() {
-  # Bezpečnější kontrola s uvozovkami
-  if [ -n "$COLCON_PREFIX_PATH" ]; then
-    if [ -z "$1" ]; then
-      cd "$COLCON_PREFIX_PATH/../src" || return 1
-      return 0
-    fi
-    # Nejprve zkusit najít balíček v aktuálním workspace
-    local package_path
-    package_path=$(
-      colcon list --base-paths "$COLCON_PREFIX_PATH/.." 2>/dev/null | \
-      grep -E "^$1\s" | awk '{print $2}'
-    )
-    if [ -n "$package_path" ]; then
-      cd "$package_path" || return 1
-      return 0
-    fi
-  fi
-
-  if [ -z "$1" ]; then
-    cd /opt/ros/jazzy/share || return 1
-    return 0
-  fi
-
-  # Poté zkusit najít balíček mezi nainstalovanými
-  local package_path
-  package_path=$(ros2 pkg prefix --share "$1" 2> /dev/null)
-  if [ -n "$package_path" ]; then
-    cd "$package_path" || return 1
-    return 0
-  fi
-
-  # Pokud nic nevyjde, skoč do workspace src (pokud existuje)
-  if [ -n "$COLCON_PREFIX_PATH" ]; then
-    cd "$COLCON_PREFIX_PATH/../src" || return 1
-  fi
-}
-
-_roscd_complete() {
-  local current_word="${COMP_WORDS[COMP_CWORD]}"
-  local packages=""
-
-  # Získání lokálních balíčků přes colcon (jen pokud jsme ve workspace)
-  if [ -n "$COLCON_PREFIX_PATH" ]; then
-    packages=$(colcon list --base-paths "$COLCON_PREFIX_PATH/.." 2>/dev/null | awk '{print $1}')
-  fi
-
-  # Rychlé získání systémových balíčků (mnohem rychlejší než 'ros2 pkg list')
-  local installed_pkgs
-  if [ -d "/opt/ros/jazzy/share" ]; then
-    installed_pkgs=$(ls /opt/ros/jazzy/share 2>/dev/null)
-    packages="$packages $installed_pkgs"
-  else
-    # Fallback, pokud z nějakého důvodu složka neexistuje
-    packages="$packages $(ros2 pkg list 2>/dev/null)"
-  fi
-
-  # Vytvoření nabídky pro autocompletion
-  COMPREPLY=($(compgen -W "$packages" -- "$current_word"))
-}
-
-# Inicializace kompatibility, pokud náhodou používáš Zsh
-if [ -n "$ZSH_VERSION" ]; then
-  autoload -U +X bashcompinit && bashcompinit
-fi
-
-complete -F _roscd_complete roscd
-
-# Automatické spuštění yazi ze Sway zkratky
-if [[ "$AUTO_YAZI" == "1" ]]; then
-    unset AUTO_YAZI
-    y
-fi
+alias roscd="cd $ROS_WORKSPACE"
+alias colcon_clean="cd $ROS_WORKSPACE && rm -rf log install build"
+# export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:"$HOME/git/acados/lib"
+# export ACADOS_SOURCE_DIR="$HOME/git/acados"
