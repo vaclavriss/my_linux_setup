@@ -16,6 +16,8 @@ mkdir -p "$HOME/.local/bin"
 copy_file_if_exists "$DOTFILES_DIR/local/bin/foot-theme-switch.sh" "$HOME/.local/bin/foot-theme-switch.sh"
 chmod +x "$HOME/.local/bin/foot-theme-switch.sh" 2>/dev/null || true
 
+
+sudo apt install grim ffmpeg jq
 copy_file_if_exists "$DOTFILES_DIR/local/bin/lock-blur.sh" "$HOME/.local/bin/lock-blur.sh"
 chmod +x "$HOME/.local/bin/lock-blur.sh" 2>/dev/null || true
 
