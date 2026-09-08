@@ -9,6 +9,7 @@ source "$SCRIPT_DIR/common.sh"
 
 sudo apt install -y sway swaybg swayidle swaylock foot || true
 
+
 copy_dir_if_exists "$DOTFILES_DIR/.config/sway" "$HOME/.config/sway"
 copy_dir_if_exists "$DOTFILES_DIR/.config/foot" "$HOME/.config/foot"
 
@@ -40,3 +41,6 @@ fi
 
 # wofi
 sudo apt install -y wofi || true
+
+# copy pasting
+sudo apt install grim slurp wl-clipboard
