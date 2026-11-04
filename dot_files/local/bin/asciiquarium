@@ -1,0 +1,3 @@
+#!/bin/sh
+# asciiquarium 1.1 + Term::Animation 2.6 (not packaged in Ubuntu 24.04); needs libcurses-perl
+exec perl -I"$HOME/.local/share/asciiquarium/lib" "$HOME/.local/share/asciiquarium/asciiquarium" "$@"

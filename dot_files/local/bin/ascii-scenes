@@ -1,0 +1,680 @@
+#!/usr/bin/env python3
+"""ascii-scenes – calm ASCII wallpapers for the kitty background panel (see `wallpaper`).
+
+    ascii-scenes night | space | forest | aquarium
+
+Everything is drawn in the terminal's 16 ANSI colours, so `theme` decides the palette
+(colour 0 is the background). The static scenery is drawn once; only moving things are
+redrawn, a few times per second, so a scene costs well under 1 % CPU.
+SCENE_LIGHT=1 (set by `wallpaper` for light palettes) keeps the forest in daylight.
+"""
+import curses
+import datetime
+import math
+import os
+import random
+import sys
+import time
+
+FPS = 4                # normal frame rate
+FAST_FPS = 20          # while a meteor flies
+LIGHT = os.environ.get("SCENE_LIGHT") == "1"
+
+# ANSI colour indices; mask letters in sprites map to them (upper case = bright)
+MASK = {"r": 1, "g": 2, "y": 3, "b": 4, "m": 5, "c": 6, "w": 7, "k": 8, "0": 0,
+        "R": 9, "G": 10, "Y": 11, "B": 12, "M": 13, "C": 14, "W": 15}
+HUES = [1, 2, 3, 4, 5, 6, 9, 10, 11, 12, 13, 14]
+EIGHTHS = " ▁▂▃▄▅▆▇█"
+MIRROR = str.maketrans("()[]{}<>/\\`'", ")(][}{><\\/'`")
+
+_pairs = {}
+
+
+def attr(fg, bg=-1, bold=False):
+    """Curses attribute for an ANSI fg/bg pair (pairs are allocated on demand)."""
+    if (fg, bg) not in _pairs:
+        _pairs[(fg, bg)] = len(_pairs) + 1
+        curses.init_pair(_pairs[(fg, bg)], fg, bg)
+    return curses.color_pair(_pairs[(fg, bg)]) | (curses.A_BOLD if bold else 0)
+
+
+def mirror(lines):
+    w = max(len(line) for line in lines)
+    return [line.ljust(w)[::-1].translate(MIRROR) for line in lines]
+
+
+def masked(lines, mask, color):
+    """Yield (dy, dx, char, colour) for the visible characters of a sprite."""
+    for dy, line in enumerate(lines):
+        for dx, ch in enumerate(line):
+            if ch != " ":
+                m = mask[dy][dx] if mask and dy < len(mask) and dx < len(mask[dy]) else " "
+                yield dy, dx, ch, MASK.get(m, color)
+
+
+def is_night():
+    if LIGHT:
+        return False
+    h = datetime.datetime.now().hour
+    return h >= 20 or h < 6
+
+
+def moon_phase():
+    """0 = new, 0.5 = full (days since a known new moon / synodic month)."""
+    ref = datetime.datetime(2000, 1, 6, 18, 14)
+    return ((datetime.datetime.now() - ref).total_seconds() / 86400 / 29.530588) % 1
+
+
+# ─── Drawing surface ──────────────────────────────────────────────────────────
+class Canvas:
+    """Static background layer plus whatever entities are drawn on top of it.
+
+    `fill` remembers the colour of solid areas (hills, mountains), so characters drawn
+    over them get that colour as their cell background instead of the terminal's.
+    """
+
+    def __init__(self, scr):
+        self.scr = scr
+        self.h, self.w = scr.getmaxyx()
+        self.bg = {}           # (y, x) -> (char, fg, bold)
+        self.fill = {}         # (y, x) -> colour of a solid area
+        self.covered = set()   # cells currently showing an entity
+
+    def inside(self, y, x):
+        return 0 <= y < self.h and 0 <= x < self.w
+
+    def put(self, y, x, ch, fg, bold=False):
+        if self.inside(y, x):
+            try:
+                self.scr.addstr(y, x, ch, attr(fg, self.fill.get((y, x), -1), bold))
+            except curses.error:   # writing the bottom-right cell
+                pass
+
+    def set_bg(self, y, x, ch, fg=7, bold=False):
+        if not self.inside(y, x):
+            return
+        if ch == " ":
+            self.bg.pop((y, x), None)
+        else:
+            self.bg[(y, x)] = (ch, fg, bold)
+        if (y, x) not in self.covered:
+            self.put(y, x, ch, fg, bold)
+
+    def solid(self, y, x, fg, frac=1.0):
+        """A filled cell (frac < 1: only the lower part, as an eighth block)."""
+        if not self.inside(y, x):
+            return
+        k = int(round(frac * 8))
+        if k <= 0:
+            return
+        if k >= 8:
+            self.fill[(y, x)] = fg
+            self.set_bg(y, x, "█", fg)
+        else:
+            self.set_bg(y, x, EIGHTHS[k], fg)
+            if k >= 4:
+                self.fill[(y, x)] = fg
+
+    def sprite_bg(self, y, x, lines, color, mask=None):
+        for dy, dx, ch, c in masked(lines, mask, color):
+            self.set_bg(y + dy, x + dx, ch, c)
+
+    def restore(self, cells):
+        for y, x in cells:
+            ch, fg, bold = self.bg.get((y, x), (" ", 7, False))
+            self.put(y, x, ch, fg, bold)
+
+
+# ─── Moving things ────────────────────────────────────────────────────────────
+class Entity:
+    """A sprite with optional animation frames, moving at vx/vy cells per second."""
+
+    def __init__(self, frames, y, x, color, vx=0.0, vy=0.0, frame_period=0.0,
+                 z=1, bold=False, masks=None):
+        self.frames, self.masks = frames, masks
+        self.fy, self.fx = float(y), float(x)
+        self.color, self.bold, self.z = color, bold, z
+        self.vx, self.vy = vx, vy
+        self.frame, self.frame_period, self.next_frame = 0, frame_period, 0.0
+        self.cells = set()
+        self.drawn = None
+
+    @property
+    def pos(self):
+        return int(round(self.fy)), int(round(self.fx))
+
+    @property
+    def width(self):
+        return max(len(line) for line in self.frames[0])
+
+    @property
+    def height(self):
+        return len(self.frames[0])
+
+    def update(self, now, dt):
+        """Advance; True if the entity has to be redrawn."""
+        self.fx += self.vx * dt
+        self.fy += self.vy * dt
+        if self.frame_period and now >= self.next_frame:
+            if self.next_frame:
+                self.frame = (self.frame + 1) % len(self.frames)
+            self.next_frame = now + self.frame_period
+        return (self.pos, self.frame) != self.drawn
+
+    def render(self):
+        y, x = self.pos
+        mask = self.masks[self.frame] if self.masks else None
+        for dy, dx, ch, c in masked(self.frames[self.frame], mask, self.color):
+            yield y + dy, x + dx, ch, c, self.bold
+
+    def gone(self, cv):
+        y, x = self.pos
+        return (self.vx < 0 and x + self.width < 0) or (self.vx > 0 and x > cv.w) or \
+               (self.vy < 0 and y + self.height < 0) or (self.vy > 0 and y > cv.h)
+
+
+class Meteor(Entity):
+    """A bright head with a fading trail; flies fast, so the scene speeds up meanwhile."""
+
+    def __init__(self, cv):
+        right = random.random() < 0.5
+        x = random.randint(0, 3 * cv.w // 4) if right else random.randint(cv.w // 4, cv.w - 1)
+        super().__init__([["*"]], random.randint(0, max(1, cv.h // 4)), x, 15,
+                         vx=(28 if right else -28) * random.uniform(0.8, 1.2),
+                         vy=random.uniform(5, 9), z=5, bold=True)
+        self.trail = []
+        self.life = random.uniform(0.6, 1.3)
+
+    def update(self, now, dt):
+        self.life -= dt
+        if self.life > 0:                            # fly on, dragging the trail
+            self.trail = (self.trail + [self.pos])[-7:]
+            super().update(now, dt)
+        else:                                        # burnt out: the trail fades away
+            self.trail = self.trail[1:]
+        return True
+
+    def render(self):
+        n = len(self.trail)
+        for i, (y, x) in enumerate(self.trail[:-1]):
+            age = n - i
+            yield y, x, "·" if age > 3 else "•", 8 if age > 4 else 7, False
+        if self.life > 0:
+            y, x = self.pos
+            yield y, x, "*", 15, True
+
+    def gone(self, cv):
+        return self.life <= 0 and not self.trail
+
+
+# ─── Scene base ───────────────────────────────────────────────────────────────
+class Scene:
+    CLOUDS = [[r"  .-~~~-.", r".(       )."], [r"   _.-~-._", r" (_______)"],
+              [r"    .--.", r" .-(    ).", r"(___.__)__)"]]
+
+    def __init__(self, cv):
+        self.cv = cv
+        self.ents = []
+        self.stars = []
+        now = time.monotonic()
+        self.next_meteor = now + random.uniform(20, 60)
+        self.next_cloud = now + random.uniform(5, 30)
+        self.build()
+
+    def build(self):
+        pass
+
+    def step(self, now, dt):
+        """Scene-specific spawning and background changes."""
+
+    @property
+    def fast(self):
+        return any(isinstance(e, Meteor) for e in self.ents)
+
+    def tick(self, now, dt):
+        self.step(now, dt)
+        moved = [e for e in self.ents if e.update(now, dt)]
+        dead = [e for e in self.ents if e.gone(self.cv)]
+        if not moved and not dead:
+            return
+        for e in set(moved) | set(dead):
+            self.cv.restore(e.cells)
+        for e in dead:
+            self.ents.remove(e)
+        covered = set()
+        for e in sorted(self.ents, key=lambda e: e.z):
+            e.cells = set()
+            for y, x, ch, fg, bold in e.render():
+                if self.cv.inside(y, x):
+                    self.cv.put(y, x, ch, fg, bold)
+                    e.cells.add((y, x))
+            e.drawn = (e.pos, e.frame)
+            covered |= e.cells
+        self.cv.covered = covered
+
+    # shared pieces ------------------------------------------------------------
+    def add_stars(self, top, bottom, density, colors=(8, 8, 7, 7, 15, 3)):
+        cv = self.cv
+        for _ in range(int(cv.w * max(0, bottom - top) * density)):
+            y, x = random.randint(top, max(top, bottom - 1)), random.randrange(cv.w)
+            if (y, x) not in cv.bg:
+                self.stars.append((y, x, random.choice(colors)))
+                cv.set_bg(y, x, random.choice("..·*+"), self.stars[-1][2])
+
+    def twinkle(self, n=2):
+        for _ in range(n):
+            if self.stars and random.random() < 0.5:
+                y, x, c = random.choice(self.stars)
+                ch = random.choice("..··*+")
+                self.cv.set_bg(y, x, ch, 15 if ch in "*+" and random.random() < 0.3 else c)
+
+    def maybe_meteor(self, now, lo=40, hi=150):
+        if now >= self.next_meteor:
+            self.ents.append(Meteor(self.cv))
+            self.next_meteor = now + random.uniform(lo, hi)
+
+    def maybe_cloud(self, now, color, top, bottom, every=(60, 180), most=2):
+        if now >= self.next_cloud and sum(e.z == 2 for e in self.ents) < most:
+            art = random.choice(self.CLOUDS)
+            w = max(len(l) for l in art)
+            right = random.random() < 0.6
+            self.ents.append(Entity([art], random.randint(top, max(top, bottom)),
+                                    -w if right else self.cv.w, color,
+                                    vx=random.uniform(0.15, 0.3) * (1 if right else -1), z=2))
+            self.next_cloud = now + random.uniform(*every)
+
+    def draw_moon(self, cy, cx, r):
+        """Moon in its real phase: the lit part bright, the dark side a faint rim."""
+        phase = moon_phase()
+        k = math.cos(2 * math.pi * phase)            # terminator position
+        waxing = phase < 0.5
+        for dy in range(-r, r + 1):
+            half = math.sqrt(max(0.0, 1 - (dy / r) ** 2))
+            for dx in range(-2 * r, 2 * r + 1):
+                nx = dx / (2 * r)
+                d = nx * nx + (dy / r) ** 2
+                if d > 1:
+                    continue
+                t = nx / half if half else 0          # -1 .. 1 across the disc
+                if (t > k) if waxing else (t < -k):
+                    self.cv.set_bg(cy + dy, cx + dx, "█", 15)
+                elif d > 0.8:
+                    self.cv.set_bg(cy + dy, cx + dx, "·", 8)
+
+    def ridge(self, base, amp, smooth, rough):
+        """Heights (rows from the top, float) of a mountain/hill silhouette."""
+        p = [random.uniform(0, 2 * math.pi) for _ in range(3)]
+        return [base - amp * (0.6 * math.sin(x / smooth + p[0]) +
+                              0.3 * math.sin(x / (smooth / 2.7) + p[1]) +
+                              0.1 * math.sin(x / (smooth / 7.3) + p[2])) -
+                random.uniform(0, rough) for x in range(self.cv.w)]
+
+    def fill_ridge(self, heights, color, bottom=None):
+        bottom = self.cv.h if bottom is None else bottom
+        for x, top in enumerate(heights):
+            top = max(0.0, top)
+            row = int(top)
+            self.cv.solid(row, x, color, 1 - (top - row))
+            for y in range(row + 1, bottom):
+                self.cv.solid(y, x, color)
+
+
+# ─── Night sky over the mountains ─────────────────────────────────────────────
+class Night(Scene):
+    CABIN = [r" /\ ", r"/__\ ", r"|▪ |"]
+    CABIN_MASK = ["0000", "00000", "0Y00"]
+
+    def build(self):
+        cv = self.cv
+        far = self.ridge(cv.h * 0.62, cv.h * 0.14, cv.w / 9, 0.3)
+        near = self.ridge(cv.h * 0.80, cv.h * 0.10, cv.w / 6, 0.2)
+        self.add_stars(0, int(min(far)), 0.012)
+        r = max(2, cv.h // 10)
+        self.draw_moon(r + 2, random.randint(cv.w // 6, cv.w - cv.w // 6), r)
+        self.fill_ridge(far, 4)
+        self.fill_ridge(near, 8)
+        x = random.randint(cv.w // 5, cv.w - cv.w // 5)
+        cv.sprite_bg(int(max(near[x:x + 4])) - 2, x, self.CABIN, 0, self.CABIN_MASK)
+
+    def step(self, now, dt):
+        self.twinkle()
+        self.maybe_meteor(now)
+        self.maybe_cloud(now, 8, 1, self.cv.h // 3)
+
+
+# ─── Planets in space ─────────────────────────────────────────────────────────
+class Space(Scene):
+    RAMP = " .:-=+*#%@"
+    SATELLITE = [["[]-o-[]"]]
+
+    def build(self):
+        cv = self.cv
+        self.add_stars(0, cv.h, 0.02, colors=(8, 8, 7, 7, 15, 6, 3, 5))
+        self.planets = []
+        for i, c in enumerate(random.sample([1, 3, 5, 6, 2, 4], 3)):
+            r = max(2, int(cv.h * random.uniform(0.12, 0.22) / (1 + i * 0.6)))
+            for _ in range(30):
+                cy = random.randint(r + 1, cv.h - r - 2)
+                cx = random.randint(4 * r + 2, cv.w - 4 * r - 3)
+                if all(abs(cx - px) > 2 * (r + pr) + 8 or abs(cy - py) > r + pr + 3
+                       for py, px, pr, *_ in self.planets):
+                    self.planets.append([cy, cx, r, c, i == 0 and random.random() < 0.8, 0.0])
+                    break
+        for p in self.planets:
+            self.draw_planet(p)
+        now = time.monotonic()
+        self.next_turn, self.next_sat = now + 6, now + random.uniform(30, 120)
+
+    def draw_planet(self, p):
+        cy, cx, r, color, ring, rot = p
+        lx, ly, lz = -0.6, -0.5, 0.62               # light from the upper left
+        for dy in range(-r, r + 1):
+            for dx in range(-2 * r, 2 * r + 1):
+                nx, ny = dx / (2 * r), dy / r
+                d = nx * nx + ny * ny
+                if d > 1:
+                    continue
+                nz = math.sqrt(1 - d)
+                light = max(0.0, nx * lx + ny * ly + nz * lz)
+                band = 0.15 * math.sin(ny * 7 + 2 * math.sin(math.atan2(nx, nz) * 2 + rot))
+                v = min(0.99, max(0.0, light + band))
+                self.cv.set_bg(cy + dy, cx + dx, self.RAMP[int(v * len(self.RAMP))],
+                               color if v > 0.25 else 8, v > 0.75)
+        if ring:
+            a, b = 2 * r * 1.9, r * 0.45
+            steps = int(8 * a)
+            for i in range(steps):
+                t = 2 * math.pi * i / steps
+                ix, iy = int(round(cx + a * math.cos(t))), int(round(cy + b * math.sin(t)))
+                if ((ix - cx) / (2 * r)) ** 2 + ((iy - cy) / r) ** 2 <= 1 and iy < cy:
+                    continue                          # behind the planet
+                self.cv.set_bg(iy, ix, "=" if math.sin(t) > 0.3 else "-", 7)
+
+    def step(self, now, dt):
+        self.twinkle(3)
+        self.maybe_meteor(now, 30, 120)
+        if now >= self.next_turn:                    # the planets slowly turn
+            for p in self.planets:
+                p[5] += 0.25
+                self.draw_planet(p)
+            self.next_turn = now + 6
+        if now >= self.next_sat:
+            right = random.random() < 0.5
+            self.ents.append(Entity(self.SATELLITE, random.randint(1, self.cv.h - 2),
+                                    -8 if right else self.cv.w + 1, 7,
+                                    vx=0.5 if right else -0.5, z=2))
+            self.next_sat = now + random.uniform(120, 300)
+
+
+# ─── Forest with animals ──────────────────────────────────────────────────────
+# Sprites face right (mirrored for walking left); masks colour individual characters.
+DEER = ([[r"       \\//", r"        \/ ", r" ______/ o'", r"/       __/", r"| |   | |  "],
+         [r"       \\//", r"        \/ ", r" ______/ o'", r"/       __/", r"/ \   / \  "]],
+        [["       kkkk", "        kk ", "         W"]] * 2)
+FOX = ([[r"          /\ ", r" ,.------/ o\_", r"(~~ ___    __>", r"    \ \  \ \  "],
+        [r"          /\ ", r" ,.------/ o\_", r"(~~ ___    __>", r"    | |  | |  "]],
+       [["", "           W", "WW"]] * 2)
+HEDGEHOG = ([[r"  ,;;;;;. ", r",;;;;;;;;o>", r"  '   '   "],
+             [r"  ,;;;;;. ", r",;;;;;;;;o>", r"   ' '    "]], None)
+RABBIT = ([[r"  (\  ", r" _/ )o", r"(  _ ,>", r" `-' ` "],
+           [r"  (\  ", r" _/ )o", r"(  _ ,>", r" `-' `-"]], None)
+BIRD = [[r"\_/"], [r"-v-"]]
+OWL = [[r"{o,o}", r"/)_)", r' " "']] * 5 + [[r"{-,-}", r"/)_)", r' " "']]   # blinks now and then
+
+
+class Animal(Entity):
+    """Walks along the ground; rabbits hop (move in bursts, then sit)."""
+
+    def __init__(self, frames, masks, y, x, color, speed, hop=False):
+        super().__init__(frames, y, x, color, vx=speed, frame_period=0.3 if hop else 0.5,
+                         z=3, masks=masks)
+        self.hop, self.rest = hop, 0.0
+
+    def update(self, now, dt):
+        if self.hop:
+            self.rest -= dt
+            if self.rest < -1.2:
+                self.rest = random.uniform(1, 4)
+            if self.rest > 0:                        # sitting still
+                return (self.pos, self.frame) != self.drawn
+        return super().update(now, dt)
+
+
+class Firefly(Entity):
+    def __init__(self, cv, top, bottom):
+        super().__init__([["•"]], random.randint(top, bottom), random.randrange(cv.w), 11, z=4)
+        self.top, self.bottom, self.on, self.next = top, bottom, True, 0.0
+
+    def update(self, now, dt):
+        if now < self.next:
+            return False
+        self.next = now + random.uniform(0.6, 2.0)
+        self.on = random.random() < 0.6
+        y, x = self.pos
+        self.fy = min(self.bottom, max(self.top, y + random.choice((-1, 0, 0, 1))))
+        self.fx = x + random.choice((-1, 0, 1))
+        return True
+
+    def render(self):
+        if self.on:
+            yield from super().render()
+
+    def gone(self, cv):
+        return False
+
+
+class Forest(Scene):
+    def pine(self, x, ground, n):
+        lines = [" " * n + "^"] + [" " * (n - i) + "/" + "^" * (2 * i - 1) + "\\"
+                                   for i in range(1, n + 1)]
+        trunk = [" " * n + "|"] * max(1, n // 3)
+        mask = ["G" * len(l) for l in lines] + [" " * n + "y" for _ in trunk]
+        self.cv.sprite_bg(ground - len(lines) - len(trunk), x, lines + trunk, 2, mask)
+
+    def leafy(self, x, ground):
+        """A round canopy of leaf texture on a short trunk; returns its top row."""
+        w, h = random.randint(9, 14), random.randint(4, 5)
+        top = ground - h - 2
+        for dy in range(h):
+            half = (w / 2) * math.sqrt(max(0.0, 1 - ((dy - (h - 1) / 2) / (h / 2)) ** 2))
+            for dx in range(w):
+                if abs(dx - (w - 1) / 2) <= half:
+                    self.cv.set_bg(top + dy, x + dx, random.choice("&%@&8"),
+                                   random.choice((2, 2, 10)))
+        for dy in range(2):
+            self.cv.set_bg(ground - 2 + dy, x + w // 2, "|", 3)
+            self.cv.set_bg(ground - 2 + dy, x + w // 2 - 1, "|", 3)
+        return top
+
+    def build(self):
+        cv = self.cv
+        self.ground = cv.h - 3
+        self.night = is_night()
+        if self.night:
+            self.add_stars(0, cv.h // 2, 0.008)
+            r = max(2, cv.h // 12)
+            self.draw_moon(r + 1, random.randint(cv.w // 8, cv.w - cv.w // 8), r)
+        else:
+            cv.sprite_bg(2, random.randint(cv.w // 8, cv.w - cv.w // 8),
+                         [r" \ | / ", r"-- O --", r" / | \ "], 3)
+        self.fill_ridge(self.ridge(cv.h * 0.62, cv.h * 0.07, cv.w / 7, 0.2), 8, self.ground)
+        x, owl_spot = random.randint(0, 4), None
+        while x < cv.w - 6:                          # pines, a few leafy trees, gaps
+            if random.random() < 0.25:
+                top = self.leafy(x, self.ground)
+                if owl_spot is None and self.night:
+                    owl_spot = (top - 2, x + 3)
+                x += 16
+            else:
+                n = random.randint(3, max(3, min(8, cv.h // 6)))
+                self.pine(x, self.ground, n)
+                x += 2 * n + random.randint(2, 10)
+        for y in range(self.ground, cv.h):           # grass and (by day) flowers
+            for x in range(cv.w):
+                if y == self.ground:
+                    flower = not self.night and random.random() < 0.03
+                    cv.set_bg(y, x, "*" if flower else random.choice(",.'\"`.,"),
+                              random.choice((5, 3, 13)) if flower else 2)
+                else:
+                    cv.set_bg(y, x, random.choice(" .,' "), 8)
+        if owl_spot:
+            self.ents.append(Entity(OWL, owl_spot[0], owl_spot[1], 3, frame_period=1.5, z=3))
+        if self.night:
+            for _ in range(max(4, cv.w // 25)):
+                self.ents.append(Firefly(cv, cv.h // 2, self.ground - 1))
+        now = time.monotonic()
+        self.next_animal = now + random.uniform(5, 20)
+        self.next_birds = now + random.uniform(20, 60)
+
+    def step(self, now, dt):
+        if self.night:
+            self.twinkle(1)
+            self.maybe_meteor(now, 60, 200)
+        else:
+            self.maybe_cloud(now, 7, 1, self.cv.h // 4, every=(40, 120))
+        if now >= self.next_animal and sum(isinstance(e, Animal) for e in self.ents) < 2:
+            (frames, masks), color, speed, hop = random.choice([
+                (DEER, 3, 1.4, False), (FOX, 1, 1.8, False),
+                (HEDGEHOG, 8, 0.6, False), (RABBIT, 7, 2.5, True)])
+            right = random.random() < 0.5
+            if not right:
+                frames = [mirror(f) for f in frames]
+            w = max(len(l) for l in frames[0])
+            if not right and masks:
+                masks = [[row.ljust(w)[::-1] for row in fm] for fm in masks]
+            self.ents.append(Animal(frames, masks, self.ground - len(frames[0]) + 1,
+                                    -w if right else self.cv.w, color,
+                                    speed if right else -speed, hop))
+            self.next_animal = now + random.uniform(25, 70)
+        if not self.night and now >= self.next_birds:
+            right = random.random() < 0.5
+            y0 = random.randint(1, max(2, self.cv.h // 4))
+            for i in range(random.randint(2, 4)):
+                self.ents.append(Entity(BIRD, y0 + random.randint(-1, 1),
+                                        (-4 - 5 * i) if right else (self.cv.w + 5 * i), 8,
+                                        vx=2.2 if right else -2.2, frame_period=0.4, z=2.5))
+            self.next_birds = now + random.uniform(40, 120)
+
+
+# ─── Aquarium ─────────────────────────────────────────────────────────────────
+FISH = [[["><>"]], [["><(((°>"]], [[r"  __  ", r"\/ o\ ", r"/\__/ "]],
+        [[r"  |\  ", r">=(°> ", r"  |/  "]]]
+CRAB = [[r"(\/)(°,,°)(\/)"], [r"(/\)(°,,°)(/\)"]]
+JELLY = [[r" .-. ", r"(   )", r" )(( "], [r" .-. ", r"(   )", r" (()) "]]
+CASTLE = [r"   |>    ", r"  _|_    ", r" |_|_|_  ", r" |[] []| ", r" |  _  | ", r" |_|_|_| "]
+CASTLE_MASK = ["    R    "]
+
+
+class Bubble(Entity):
+    """Grows while it rises: . o O, pops below the surface."""
+
+    def __init__(self, y, x):
+        super().__init__([["."]], y, x, 6, vy=-random.uniform(1.2, 1.8), z=4)
+        self.start = y
+
+    def render(self):
+        y, x = self.pos
+        risen = self.start - y
+        near_top = y < 8
+        yield y, x, "O" if near_top else "o" if risen >= 3 else ".", 14 if near_top else 6, False
+
+    def gone(self, cv):
+        return self.pos[0] <= 1
+
+
+class Aquarium(Scene):
+    def build(self):
+        cv = self.cv
+        self.sand, self.wave = cv.h - 2, 0
+        self.draw_surface()
+        for y in range(self.sand, cv.h):
+            for x in range(cv.w):
+                cv.set_bg(y, x, random.choice(".,:;'. "), 3 if random.random() < 0.7 else 8)
+        cv.sprite_bg(self.sand - len(CASTLE), random.randint(cv.w // 6, cv.w - cv.w // 6),
+                     CASTLE, 8, CASTLE_MASK)
+        for _ in range(max(3, cv.w // 18)):          # pebbles
+            cv.set_bg(self.sand - 1, random.randrange(cv.w), random.choice("o@°"), 8)
+        for _ in range(max(3, cv.w // 14)):          # swaying seaweed
+            x, n = random.randrange(cv.w), random.randint(3, max(3, cv.h // 3))
+            a = ["(" if i % 2 else ")" for i in range(n)]
+            b = [")" if i % 2 else "(" for i in range(n)]
+            self.ents.append(Entity([a, b], self.sand - n, x, random.choice((2, 10)),
+                                    frame_period=random.uniform(1.6, 2.8), z=1))
+        self.aerator = random.randrange(cv.w)
+        self.want = max(3, min(9, cv.w * cv.h // 700))
+        now = time.monotonic()
+        self.next_bubble, self.next_wave = now, now + 1.5
+        self.next_crab, self.next_jelly = now + random.uniform(30, 90), now + random.uniform(60, 200)
+
+    def draw_surface(self):
+        for x in range(self.cv.w):
+            self.cv.set_bg(0, x, "~" if (x + self.wave) % 7 else "^",
+                           12 if (x + self.wave) % 13 == 0 else 4)
+
+    def spawn_fish(self, edge=True):
+        frames = random.choice(FISH)
+        right = random.random() < 0.5
+        if not right:
+            frames = [mirror(f) for f in frames]
+        w, h = max(len(l) for l in frames[0]), len(frames[0])
+        taken = [range(e.pos[0] - 1, e.pos[0] + e.height + 1) for e in self.ents if e.z == 3]
+        for _ in range(10):                          # a free lane, so fish do not overlap
+            y = random.randint(2, max(2, self.sand - h - 2))
+            if not any(y in r or y + h - 1 in r for r in taken):
+                break
+        x = (-w if right else self.cv.w) if edge else random.randrange(max(1, self.cv.w - w))
+        speed = random.uniform(0.5, 1.6)
+        self.ents.append(Entity(frames, y, x, random.choice(HUES),
+                                vx=speed if right else -speed, z=3))
+
+    def step(self, now, dt):
+        fish = sum(e.z == 3 for e in self.ents)
+        if fish < self.want:
+            self.spawn_fish(edge=fish > 0)
+        if now >= self.next_wave:
+            self.wave += 1
+            self.draw_surface()
+            self.next_wave = now + 1.5
+        if now >= self.next_bubble:
+            self.ents.append(Bubble(self.sand - 1, self.aerator))
+            self.next_bubble = now + random.uniform(1.5, 4)
+        if now >= self.next_crab:
+            right = random.random() < 0.5
+            self.ents.append(Entity(CRAB, self.sand - 1, -14 if right else self.cv.w, 9,
+                                    vx=0.7 if right else -0.7, frame_period=0.6, z=3.5))
+            self.next_crab = now + random.uniform(90, 240)
+        if now >= self.next_jelly:
+            self.ents.append(Entity(JELLY, self.sand, random.randrange(max(1, self.cv.w - 6)), 13,
+                                    vy=-0.35, frame_period=1.2, z=3.5))
+            self.next_jelly = now + random.uniform(150, 400)
+
+
+SCENES = {"night": Night, "space": Space, "forest": Forest, "aquarium": Aquarium}
+
+
+def main(scr, scene_cls):
+    curses.curs_set(0)
+    curses.use_default_colors()
+    scr.nodelay(True)
+    scene = scene_cls(Canvas(scr))
+    last = time.monotonic()
+    while True:
+        now = time.monotonic()
+        scene.tick(now, now - last)
+        last = now
+        scr.noutrefresh()
+        curses.doupdate()
+        if scr.getch() == curses.KEY_RESIZE:
+            curses.update_lines_cols()
+            scr.clear()
+            scene = scene_cls(Canvas(scr))
+        time.sleep(1 / (FAST_FPS if scene.fast else FPS))
+
+
+if __name__ == "__main__":
+    if len(sys.argv) != 2 or sys.argv[1] not in SCENES:
+        sys.exit(__doc__)
+    try:
+        curses.wrapper(main, SCENES[sys.argv[1]])
+    except KeyboardInterrupt:
+        pass

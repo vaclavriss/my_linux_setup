@@ -75,7 +75,21 @@ require("lazy").setup({
     name = "catppuccin",
     priority = 1000,
     config = function()
-      vim.cmd.colorscheme("catppuccin")
+      -- Colours from `theme <name>` (lua/theme_colors.lua); `theme` calls
+      -- ThemeReload() in running instances over their server socket.
+      function _G.ThemeReload()
+        package.loaded.theme_colors = nil
+        local ok, t = pcall(require, "theme_colors")
+        if not ok then t = { flavour = "mocha", background = "dark", overrides = {} } end
+        vim.o.background = t.background
+        require("catppuccin").setup({
+          flavour = t.flavour,
+          transparent_background = t.transparent or false, -- lets a translucent foot show through
+          color_overrides = { [t.flavour] = t.overrides },
+        })
+        vim.cmd.colorscheme("catppuccin-" .. t.flavour)
+      end
+      ThemeReload()
     end,
   },
 

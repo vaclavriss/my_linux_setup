@@ -28,7 +28,10 @@ include /etc/sway/config-vars.d/*
 #
 # Default wallpaper (more resolutions are available in /usr/share/backgrounds/sway/)
 # output * bg /usr/share/backgrounds/sway/Sway_Wallpaper_Blue_1920x1080.png fill
-output * bg ~/.config/sway/1920x1080-black-solid-color-background.jpg fill
+# output * bg ~/.config/sway/1920x1080-black-solid-color-background.jpg fill
+# Wallpaper: animated ASCII (kitty panel in the background layer), see `wallpaper`.
+# Do not set `output * bg` here – sway's swaybg would cover the animation.
+exec ~/.local/bin/wallpaper
 #
 # Example configuration:
 #
@@ -229,20 +232,25 @@ bindsym XF86MonBrightnessDown exec brightnessctl set 5%-
 bindsym XF86AudioRaiseVolume exec wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%+
 bindsym XF86AudioLowerVolume exec wpctl set-volume @DEFAULT_AUDIO_SINK@ 5%-
 bindsym XF86AudioMute exec wpctl set-mute @DEFAULT_AUDIO_SINK@ toggle
-# bindsym XF86AudioMicMute exec pactl set-source-mute @DEFAULT_SOURCE@ toggle
+
 
 # Setup window
 default_border pixel 5
 gaps inner 5
 gaps outer 5
 
-# class                 border  backgr. text    indic.  child_border
-client.focused          #c3110c #280905 #740a03 #e97f4a #e97f4a
-client.focused_inactive #740a03 #280905 #740a03 #607b8f #607b8f
-client.unfocused        #740a03 #280905 #740a03 #740a03 #607B8F
+# Title bars / tabs ($mod+w, $mod+s); colours from `theme <name>` (~/.config/themes/palettes/)
+font pango:MesloLGS NF Bold 13
+title_align center
+titlebar_padding 10 4
+titlebar_border_thickness 0
+
+include ~/.config/sway/theme.conf
 
 # Change second-extension display in CTU to 1.5
-output DP-3 scale 1.5
+output DP-1 scale 1.5
+
+
 
 # Printscreen 
 bindsym $mod+p exec grim -g "$(slurp)" - | wl-copy
@@ -255,8 +263,5 @@ include /etc/sway/config.d/*
 
 
 seat * xcursor_theme Yaru 24
-
-exec dbus-update-activation-environment --systemd WAYLAND_DISPLAY XDG_CURRENT_DESKTOP=sway
-exec systemctl --user import-environment WAYLAND_DISPLAY XDG_CURRENT_DESKTOP
 
 # exec foot -e tmux

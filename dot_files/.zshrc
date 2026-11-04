@@ -117,26 +117,29 @@ export EDITOR='nvim'
 # To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
 [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
 
-export LS_COLORS='di=1;38;2;230;80;27:fi=1;38;2;233;127;74'
-export LS_COLORS='di=1;38;2;230;80;27:fi=1;38;2;247;227;150'
-
+# source ROS 2 jazzy
+source /opt/ros/jazzy/setup.zsh
 
 # WARN and ERROR colours 
 export RCUTILS_COLORIZED_OUTPUT=1
 
-# Directories and regular files
-export LS_COLORS='di=1;38;2;233;127;74:'  # directory
-LS_COLORS+='fi=1;38;2;247;227;150:'      # regular file
-
-ZSH_HIGHLIGHT_STYLES[arg0]='fg=#607B8F,bold'
-
-ZSH_HIGHLIGHT_STYLES[unknown-token]='fg=#E97F4A,bold'
-
-ZSH_HIGHLIGHT_STYLES[argument]='fg=#607B8F,bold'
-
-ZSH_HIGHLIGHT_STYLES[builtin]='fg=#607B8F,bold'
-
-ZSH_HIGHLIGHT_STYLES[sudo]='fg=#607B8F,bold'
+# Colours from `theme <name>` (~/.config/themes): p10k prompt, syntax highlighting,
+# LS_COLORS. Re-read at the next prompt after a theme switch, so open shells follow.
+zmodload -F zsh/stat b:zstat
+_theme_zsh=~/.config/zsh/theme.zsh
+_theme_sync() {
+  local -a mtime
+  zstat -A mtime +mtime $_theme_zsh 2>/dev/null || return 0
+  [[ $mtime[1] == $_theme_mtime ]] && return 0
+  _theme_mtime=$mtime[1]
+  source $_theme_zsh
+  [[ $1 == reload ]] && (( $+functions[p10k] )) && p10k reload
+  return 0
+}
+_theme_sync
+_theme_sync_precmd() { _theme_sync reload }
+autoload -Uz add-zsh-hook
+add-zsh-hook precmd _theme_sync_precmd
 
 function y() {
   local tmp="$(mktemp -t yazi-cwd.XXXXXX)" cwd
@@ -147,26 +150,39 @@ function y() {
 }
 
 alias sz="source ~/.zshrc"
-alias sm="bash ~/.local/bin/foot-theme-switch.sh"
+alias sm="theme toggle"   # dark <-> light variant of the current palette
 alias e="exit"
 alias z="nvim ~/.zshrc"
 alias t="bash /home/vaclav/git/Edge-Teams-Container/run.sh"
-alias cc="cd $ROS_WORKSPACE && rm -rf install build log"
+alias roscd="cd $ROS_WORKSPACE"
+alias colcon_clean="cd $ROS_WORKSPACE && rm -rf log install build"
+
+
 alias cb="colcon build"
 
 alias s="nvim ~/.config/sway/config"
+alias s4="cd ~/git/ss-26-internal/internal/04_uav_system_start/"
+alias s5="cd ~/git/ss-26-internal/internal/05_mrim_task/"
 
 # Created by `pipx` on 2026-04-17 12:42:11
 export PATH="$PATH:/home/vaclav/.local/bin"
 
 # ROS 2 my workspace
+
 source /home/vaclav/ros2_ws/install/setup.zsh
 
 export ROS_WORKSPACE=/home/vaclav/ros2_ws/
-export ACADOS_SOURCE_DIR=/home/vaclav/git/acados
-export ACADOS_VENV_DIR=/home/vaclav/.venv/acados_new # Python virtual environment directory (e.g., `~/.venv/acados`)
+export ACADOS_SOURCE_DIR=~/git/acados
+export ACADOS_VENV_DIR=~/.venv/acados # Python virtual environment directory (e.g., `~/.venv/acados`)
 
-alias roscd="cd $ROS_WORKSPACE"
-alias colcon_clean="cd $ROS_WORKSPACE && rm -rf log install build"
-# export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:"$HOME/git/acados/lib"
-# export ACADOS_SOURCE_DIR="$HOME/git/acados"
+
+# Automatické spuštění yazi ze Sway zkratky
+if [[ "$AUTO_YAZI" == "1" ]]; then
+    unset AUTO_YAZI
+    y
+fi
+
+export LD_LIBRARY_PATH=$LD_LIBRARY_PATH:"$HOME/git/acados/lib"
+
+export ACADOS_SOURCE_DIR="$HOME/git/acados"
+export GHIDRA_INSTALL_DIR=/home/vaclav/ghidra_12.1.4_PUBLIC

@@ -58,12 +58,12 @@ else
 	echo "Skipping missing module: git-tmux.sh" >&2
 fi
 
-if [[ -r "$MODULE_DIR/sway.sh" ]]; then
-	echo "---- Running module: sway.sh ----"
+if [[ -r "$MODULE_DIR/sway-waybar-wofi.sh" ]]; then
+	echo "---- Running module: sway-waybar-wofi.sh ----"
 	# shellcheck source=/dev/null
 	source "$MODULE_DIR/sway-waybar-wofi.sh"
 else
-	echo "Skipping missing module: sway.sh" >&2
+	echo "Skipping missing module: sway-waybar-wofi.sh" >&2
 fi
 
 if [[ -r "$MODULE_DIR/yazi.sh" ]]; then
@@ -71,7 +71,16 @@ if [[ -r "$MODULE_DIR/yazi.sh" ]]; then
 	# shellcheck source=/dev/null
 	source "$MODULE_DIR/yazi.sh"
 else
-echo "Skipping missing module: yazi.sh" >&2
+	echo "Skipping missing module: yazi.sh" >&2
+fi
+
+# Needs the configs and yazi flavors installed above; generates all colour files
+if [[ -r "$MODULE_DIR/theme-wallpaper.sh" ]]; then
+	echo "---- Running module: theme-wallpaper.sh ----"
+	# shellcheck source=/dev/null
+	source "$MODULE_DIR/theme-wallpaper.sh"
+else
+	echo "Skipping missing module: theme-wallpaper.sh" >&2
 fi
 
 if [[ -r "$MODULE_DIR/utils.sh" ]]; then
