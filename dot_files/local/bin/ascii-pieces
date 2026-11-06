@@ -1,0 +1,261 @@
+#!/usr/bin/env node
+/*
+ * ascii-pieces – plays an ascii.rest scene full-screen as coloured ASCII text, for the kitty
+ * wallpaper panel (see `wallpaper`).
+ *
+ *   ascii-pieces <scene> [--fps n]     e.g. aurora-fjord, saturn-rise, lantern-lake
+ *   ascii-pieces list
+ *
+ * The scenes are ascii.rest pieces by @bas3line (https://github.com/bas3line/ascii, MIT licence),
+ * copied unchanged into ~/.local/share/ascii-pieces/pieces/. A scene draws a 200 x 100 grid of
+ * square cells, each a dot (· • ●) in a palette colour. Every terminal cell here averages the
+ * dots it covers (softened by a 1-4-1 blur, so the dithering reads as tone): how bright they
+ * make it picks a character from an ASCII ramp, their colour becomes the character's colour
+ * (truecolor), and a toned-down shade of it the cell's background, so areas read as areas. Only characters that
+ * changed are sent, so the terminal does little work. The picture fills the window (scaled and
+ * cropped); a small font (`wallpaper` sets one) gives more characters, so more detail.
+ *
+ *   ASCII_PIECES_FPS    frames per second (default 4; the scenes move slowly)
+ *   ASCII_PIECES_RAMP   characters from empty to full (default " .:-=+*#%@")
+ *   ASCII_PIECES_GAMMA  tone curve of the ramp, > 1 leaves dark tones blank (default 1.6)
+ *   ASCII_PIECES_BG     how much of the tone the cell background takes, 0 = only the ground (0.45)
+ */
+"use strict";
+const fs = require("node:fs");
+const os = require("node:os");
+const path = require("node:path");
+const { pathToFileURL } = require("node:url");
+
+const DIR = process.env.ASCII_PIECES_DIR || path.join(os.homedir(), ".local/share/ascii-pieces/pieces");
+const RAMP = process.env.ASCII_PIECES_RAMP || " .:-=+*#%@";
+const GAMMA = Number(process.env.ASCII_PIECES_GAMMA) || 1.6;   // > 1 keeps dark tones blank
+const BGK = process.env.ASCII_PIECES_BG !== undefined ? Number(process.env.ASCII_PIECES_BG) : 0.45;  // cell background: share of the tone
+const INK = { " ": 0, "·": 0.15, "•": 0.45, "●": 0.9, "░": 0.25, "▒": 0.5, "▓": 0.75, "█": 1 };
+const NEAR = 8;     // a colour that moved by no more than this per channel is not sent again
+const GAP = 4;      // unchanged cells a run of changed ones carries over instead of jumping
+
+const scenes = () => fs.readdirSync(DIR).filter((f) => f.endsWith(".ts")).map((f) => f.slice(0, -3)).sort();
+
+const args = process.argv.slice(2);
+if (!args.length || args[0] === "-h" || args[0] === "--help") {
+  console.log(fs.readFileSync(__filename, "utf8").split("*/")[0].replace(/^#!.*\n\/\*\n/, "").replace(/^ \* ?/gm, ""));
+  process.exit(0);
+}
+if (args[0] === "list") {
+  console.log(scenes().join("\n"));
+  process.exit(0);
+}
+const name = args[0];
+const fi = args.indexOf("--fps");
+const FPS = Number(fi > 0 ? args[fi + 1] : process.env.ASCII_PIECES_FPS) || 4;
+const file = path.join(DIR, `${name}.ts`);
+if (!fs.existsSync(file)) {
+  console.error(`ascii-pieces: no scene "${name}" (ascii-pieces list)`);
+  process.exit(1);
+}
+
+const hex = (h) => parseInt(h.slice(1, 7), 16);
+const out = (s) => process.stdout.write(s);
+
+// source interval [off + i*len/m, off + (i+1)*len/m) for each of m outputs, flattened:
+// output i takes source cells idx[at[i]..at[i+1]) with weights wt[..]
+function table(off, len, m, n) {
+  const at = new Int32Array(m + 1), idx = [], wt = [];
+  for (let i = 0; i < m; i++) {
+    const a = off + (i * len) / m, b = off + ((i + 1) * len) / m;
+    for (let j = Math.floor(a); j < Math.ceil(b); j++) {
+      const w = Math.min(j + 1, b) - Math.max(j, a);
+      if (w > 1e-9) idx.push(Math.min(n - 1, Math.max(0, j))), wt.push(w / (b - a));
+    }
+    at[i + 1] = idx.length;
+  }
+  return { at, idx: Int32Array.from(idx), wt: Float32Array.from(wt) };
+}
+
+// the window's size in pixels (CSI 14 t), answered by kitty on stdin; gives the picture's shape
+function pixels() {
+  return new Promise((done) => {
+    const fallback = { w: (process.stdout.columns || 80) * 10, h: (process.stdout.rows || 24) * 20 };
+    if (!process.stdin.isTTY) return done(fallback);
+    let buf = "";
+    const finish = (v) => {
+      clearTimeout(timer);
+      process.stdin.off("data", on);
+      process.stdin.pause();
+      done(v);
+    };
+    const on = (d) => {
+      buf += d.toString("latin1");
+      const m = buf.match(/\x1b\[4;(\d+);(\d+)t/);
+      if (m) finish({ h: +m[1], w: +m[2] });
+    };
+    const timer = setTimeout(() => finish(fallback), 1500);
+    process.stdin.setRawMode(true);
+    process.stdin.on("data", on);
+    process.stdin.resume();
+    out("\x1b[14t");
+  });
+}
+
+(async () => {
+  const mod = await import(pathToFileURL(file).href);
+  const { meta } = mod;
+  const cols = meta.cols, rows = meta.rows;
+  const frame = mod.default({ ...(meta.options || {}) });
+  const inks = meta.palette.map(hex);
+  const ground = hex(meta.ground || "#000000");
+  const paper = 0.2126 * (ground >> 16) + 0.7152 * ((ground >> 8) & 255) + 0.0722 * (ground & 255) >= 128;
+  const color = new Uint8Array(cols * rows);
+  const cov = new Float32Array(cols * rows);        // ink of each source cell (blurred)
+  const rgb = new Float32Array(cols * rows * 3);    // its dot's colour, times its ink (blurred)
+  const tmp = new Float32Array(cols * rows * 4);
+  const GR = ground >> 16, GG = (ground >> 8) & 255, GB = ground & 255;
+  const gl = 0.2126 * (ground >> 16) + 0.7152 * ((ground >> 8) & 255) + 0.0722 * (ground & 255);
+  let lref = 0;                                     // brightness that tops the ramp, from the first frame
+
+  let W = 0, H = 0, ax, dy, curCh, curFg, curBg, lumBuf, sentCh, sentFg, sentBg, ready = false;
+  const setup = async () => {
+    ready = false;
+    const { w, h } = await pixels();
+    W = process.stdout.columns || 80;
+    H = process.stdout.rows || 24;
+    // cover: the part of the scene with the window's shape, centred
+    const R = w / h;
+    let vw = cols, vh = rows;
+    if (R > cols / rows) vh = cols / R;
+    else vw = rows * R;
+    ax = table((cols - vw) / 2, vw, W, cols);
+    dy = table((rows - vh) / 2, vh, H, rows);
+    curCh = new Uint8Array(W * H);
+    curFg = new Int32Array(W * H);
+    curBg = new Int32Array(W * H);
+    lumBuf = new Float32Array(W * H);
+    sentCh = new Uint8Array(W * H).fill(255);
+    sentFg = new Int32Array(W * H).fill(-1);
+    sentBg = new Int32Array(W * H).fill(-1);
+    out("\x1b[0m\x1b[2J");
+    ready = true;
+  };
+
+  // 1-4-1 blur across and down (as ascii.rest's terminal player), so the dithering reads as tone
+  const blur = () => {
+    const n = cols * rows;
+    for (let pass = 0; pass < 2; pass++) {
+      const st = pass ? cols : 1, lim = pass ? rows : cols;
+      for (let k = 0; k < n; k++) {
+        tmp[4 * k] = cov[k]; tmp[4 * k + 1] = rgb[3 * k]; tmp[4 * k + 2] = rgb[3 * k + 1]; tmp[4 * k + 3] = rgb[3 * k + 2];
+      }
+      for (let k = 0; k < n; k++) {
+        const pos = pass ? Math.floor(k / cols) : k % cols;
+        let w = 4, a = 4 * tmp[4 * k], r = 4 * tmp[4 * k + 1], g = 4 * tmp[4 * k + 2], b = 4 * tmp[4 * k + 3];
+        if (pos > 0) { const j = 4 * (k - st); a += tmp[j]; r += tmp[j + 1]; g += tmp[j + 2]; b += tmp[j + 3]; w++; }
+        if (pos < lim - 1) { const j = 4 * (k + st); a += tmp[j]; r += tmp[j + 1]; g += tmp[j + 2]; b += tmp[j + 3]; w++; }
+        cov[k] = a / w; rgb[3 * k] = r / w; rgb[3 * k + 1] = g / w; rgb[3 * k + 2] = b / w;
+      }
+    }
+  };
+
+  const near = (a, b) =>
+    a === b ||
+    (Math.abs((a >> 16) - (b >> 16)) <= NEAR && Math.abs(((a >> 8) & 255) - ((b >> 8) & 255)) <= NEAR &&
+      Math.abs((a & 255) - (b & 255)) <= NEAR);
+  const top = RAMP.length - 1;
+  const start = performance.now();
+
+  const draw = () => {
+    if (!ready) return;
+    const lines = frame((performance.now() - start) / 1000, { paper, color }).split("\n");
+    for (let y = 0, k = 0; y < rows; y++) {
+      const line = lines[y] || "";
+      for (let x = 0; x < cols; x++, k++) {
+        const ch = line[x];
+        const c = INK[ch] ?? (ch && ch !== " " ? 0.5 : 0);
+        const ink = inks[color[k]] ?? inks[0];
+        cov[k] = c;
+        rgb[3 * k] = c * (ink >> 16);
+        rgb[3 * k + 1] = c * ((ink >> 8) & 255);
+        rgb[3 * k + 2] = c * (ink & 255);
+      }
+    }
+    blur();
+    const { at: xa, idx: xi, wt: xw } = ax, { at: ya, idx: yi, wt: yw } = dy;
+    for (let ty = 0, k = 0; ty < H; ty++)
+      for (let tx = 0; tx < W; tx++, k++) {
+        let c = 0, r = 0, g = 0, b = 0;
+        for (let q = ya[ty]; q < ya[ty + 1]; q++) {
+          const row = yi[q] * cols, wy = yw[q];
+          for (let s = xa[tx]; s < xa[tx + 1]; s++) {
+            const i = row + xi[s], w = wy * xw[s];
+            c += cov[i] * w;
+            r += rgb[3 * i] * w;
+            g += rgb[3 * i + 1] * w;
+            b += rgb[3 * i + 2] * w;
+          }
+        }
+        // brightness of the tone the dots make over the ground, against the scene's brightest
+        const lum = c > 0 ? (0.2126 * r + 0.7152 * g + 0.0722 * b) - gl * c : 0;
+        lumBuf[k] = lum;
+        const level = lref > 0 && lum > 0 ? Math.round(Math.pow(Math.min(1, lum / lref), GAMMA) * top) : 0;
+        curCh[k] = level;
+        // the dots' own colour, not dimmed by how much they cover: the character's weight does that
+        curFg[k] = level
+          ? (Math.min(255, Math.round(r / c)) << 16) | (Math.min(255, Math.round(g / c)) << 8) | Math.min(255, Math.round(b / c))
+          : -1;
+        // the cell's background: the tone itself, toned down, so areas read as areas
+        const t = BGK * Math.min(1, c);
+        curBg[k] = BGK > 0
+          ? (Math.round(GR + (Math.min(255, r / Math.max(c, 1e-6)) - GR) * t) << 16) |
+            (Math.round(GG + (Math.min(255, g / Math.max(c, 1e-6)) - GG) * t) << 8) |
+            Math.round(GB + (Math.min(255, b / Math.max(c, 1e-6)) - GB) * t)
+          : ground;
+      }
+    if (!lref) {                                    // first frame: its 98th percentile, then draw again
+      const sorted = Float32Array.from(lumBuf).sort();
+      lref = Math.max(1, sorted[Math.floor(sorted.length * 0.98)]);
+      return draw();
+    }
+    const changed = (k) => curCh[k] !== sentCh[k] || !near(curBg[k], sentBg[k]) || (curCh[k] !== 0 && !near(curFg[k], sentFg[k]));
+    let s = "";
+    for (let y = 0; y < H; y++) {
+      const row = y * W;
+      for (let x = 0; x < W; ) {
+        if (!changed(row + x)) { x++; continue; }
+        let end = x + 1;
+        for (let j = x + 1, gap = 0; j < W && gap <= GAP; j++) {
+          if (changed(row + j)) (end = j + 1), (gap = 0);
+          else gap++;
+        }
+        let run = `\x1b[${y + 1};${x + 1}H`, ink = -2, under = -2;
+        for (let k = row + x; k < row + end; k++) {
+          const lv = curCh[k], f = curFg[k], u = curBg[k];
+          if (u !== under) (run += `\x1b[48;2;${u >> 16};${(u >> 8) & 255};${u & 255}m`), (under = u);
+          sentBg[k] = u;
+          if (lv && f !== ink) (run += `\x1b[38;2;${f >> 16};${(f >> 8) & 255};${f & 255}m`), (ink = f);
+          run += RAMP[lv];
+          sentCh[k] = lv;
+          sentFg[k] = f;
+        }
+        s += run;
+        x = end;
+      }
+    }
+    if (s) out(s);
+  };
+
+  // the window's background in the scene's ground, so blanks need no colour
+  out(`\x1b[?1049h\x1b[?25l\x1b[?7l\x1b]11;${meta.ground || "#000000"}\x1b\\\x1b[2J`);
+  const quit = () => {
+    out("\x1b[0m\x1b]111\x1b\\\x1b[?7h\x1b[?25h\x1b[?1049l");
+    process.exit(0);
+  };
+  process.on("SIGTERM", quit);
+  process.on("SIGINT", quit);
+  process.on("SIGHUP", quit);
+  await setup();
+  process.stdout.on("resize", () => setup());
+  draw();
+  setInterval(draw, 1000 / FPS);
+})().catch((e) => {
+  console.error(`ascii-pieces: ${e && e.stack ? e.stack : e}`);
+  process.exit(1);
+});

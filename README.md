@@ -28,7 +28,8 @@ Two commands drive the look:
 - `theme <palette>` switches the colours of sway, waybar, tmux, foot, wofi, zsh/p10k, yazi
   and nvim at once.
 - `wallpaper` runs calm ASCII scenes, colour-matched to the palette, behind a translucent
-  foot: bonsai, forest animals, planets and meteors, night sky over mountains, aquarium.
+  foot: bonsai, forest animals, planets and meteors, night sky over mountains, aquarium,
+  a rotating galaxy, and eight full-colour ascii.rest scenes drawn as coloured ASCII.
 
 See [docs/theme-and-wallpaper.md](docs/theme-and-wallpaper.md).
 

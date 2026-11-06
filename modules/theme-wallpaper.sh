@@ -38,12 +38,23 @@ if [[ ! -f "$AQ/asciiquarium" ]]; then
     rm -rf "$TMP_DIR"
 fi
 
+# Node.js >= 22.18 for ascii-pieces (it loads the ascii.rest scenes as TypeScript, which
+# needs Node's built-in type stripping); Ubuntu 24.04 ships 18, so use NodeSource's 24.x
+node_ok() { command -v node >/dev/null && node -e 'const [a,b]=process.versions.node.split(".").map(Number); process.exit(a>22||(a===22&&b>=18)?0:1)'; }
+if ! node_ok; then
+    curl -fsSL https://deb.nodesource.com/setup_24.x | sudo -E bash - && sudo apt install -y nodejs || true
+    node_ok || echo "WARNING: node >= 22.18 missing, the ascii.rest wallpaper scenes will not run" >&2
+fi
+
 # Scripts
 mkdir -p "$HOME/.local/bin"
-for f in theme wallpaper ascii-scenes asciiquarium; do
+for f in theme wallpaper ascii-scenes ascii-pieces asciiquarium; do
     copy_file_if_exists "$DOTFILES_DIR/local/bin/$f" "$HOME/.local/bin/$f"
     chmod +x "$HOME/.local/bin/$f" 2>/dev/null || true
 done
+
+# ascii.rest scenes (MIT, github.com/bas3line/ascii) played by ascii-pieces
+copy_dir_if_exists "$DOTFILES_DIR/local/share/ascii-pieces" "$HOME/.local/share/ascii-pieces"
 
 # Palettes + recoloured yazi icon list (regenerate with `theme yazi-icons` after a yazi upgrade)
 copy_dir_if_exists "$DOTFILES_DIR/.config/themes" "$HOME/.config/themes"

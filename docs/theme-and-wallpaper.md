@@ -19,8 +19,10 @@ theme yazi-icons      # re-extract yazi's icon glyphs (after a yazi upgrade)
 
 wallpaper             # start the saved mode (sway runs this at login)
 wallpaper theme       # the palette's scenes, one per monitor, rotating every 30 min
-wallpaper space       # one scene everywhere: bonsai night space forest aquarium
+wallpaper space       # one scene everywhere: bonsai night space forest aquarium galaxy
                       #                       asciiquarium cmatrix static
+wallpaper saturn-rise # an ascii.rest scene (see below): alpine-dawn aurora-fjord
+                      # desert-night earthrise kyoto-dusk lantern-lake misty-forest saturn-rise
 wallpaper next        # next scenes now
 wallpaper list        # scenes and the active mode
 wallpaper stop
@@ -44,8 +46,12 @@ The module:
    0.32 is too old for background panels on several outputs.
 3. Downloads asciiquarium 1.1 and Term::Animation 2.6 into
    `~/.local/share/asciiquarium`. Neither is packaged in Ubuntu 24.04.
-4. Copies the scripts to `~/.local/bin` and the palettes to `~/.config/themes`.
-5. Runs `theme $THEME`, which generates every colour file.
+4. Installs Node.js 24 from NodeSource if node is older than 22.18. `ascii-pieces` loads
+   the ascii.rest scenes as TypeScript, which needs Node's built-in type stripping, and
+   Ubuntu 24.04 ships Node 18.
+5. Copies the scripts to `~/.local/bin`, the ascii.rest scenes to
+   `~/.local/share/ascii-pieces` and the palettes to `~/.config/themes`.
+6. Runs `theme $THEME`, which generates every colour file.
 
 Then log out and back into sway.
 
@@ -65,7 +71,9 @@ Sources, kept in this repo:
 |---|---|---|
 | `dot_files/local/bin/theme` | `~/.local/bin/theme` | generator + reloader |
 | `dot_files/local/bin/wallpaper` | `~/.local/bin/wallpaper` | kitty background panels, per-monitor scenes, rotation, hot-plug |
-| `dot_files/local/bin/ascii-scenes` | `~/.local/bin/ascii-scenes` | Python/curses scenes: night, space, forest, aquarium |
+| `dot_files/local/bin/ascii-scenes` | `~/.local/bin/ascii-scenes` | Python/curses scenes: night, space, forest, aquarium, galaxy |
+| `dot_files/local/bin/ascii-pieces` | `~/.local/bin/ascii-pieces` | Node player for the ascii.rest scenes, as coloured ASCII |
+| `dot_files/local/share/ascii-pieces/` | `~/.local/share/ascii-pieces/` | 8 ascii.rest scenes, unchanged, with their MIT licence and source commit |
 | `dot_files/local/bin/asciiquarium` | `~/.local/bin/asciiquarium` | wrapper for the downloaded asciiquarium |
 | `dot_files/.config/themes/palettes/*.sh` | `~/.config/themes/palettes/` | the palettes; roles documented in `steel.sh` |
 | `dot_files/.config/themes/yazi-icons.txt` | `~/.config/themes/` | yazi's built-in icons with their original colours, recoloured by hue |
@@ -155,6 +163,87 @@ If you add `<name>-light.sh`, `theme toggle` switches between the two variants.
   over solid areas (hills, sand) the area's background colour.
 - **Custom scenes:** put any executable in `~/.config/wallpaper/<name>` and use it with
   `wallpaper <name>`.
+- **Meteors:** each scene sets its own interval with `maybe_meteor(now, lo, hi)`. In
+  `space` a meteor comes every 10–45 s.
+
+### Galaxy
+
+`wallpaper galaxy` shows a spiral galaxy turning in a starfield. Its parameters follow the
+controls of the "rotating galaxy" on asciiart.eu. That page's code is reserved by its author,
+so this is a new implementation. Set the parameters with environment variables:
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `GALAXY_ARMS` | 3 | spiral arms |
+| `GALAXY_STARS` | 600 | stars in the galaxy |
+| `GALAXY_SPEED` | 20 | rotation in degrees per second |
+| `GALAXY_SIZE` | 70 | diameter in % of the screen |
+| `GALAXY_TWIST` | 0.45 | how tightly the arms wind |
+| `GALAXY_NOISE` | 0.15 | scatter of stars off the arms |
+| `GALAXY_GLOW` | 0.45 | core and arm halo |
+| `GALAXY_TWINKLE` | 0.35 | star flicker |
+| `GALAXY_TILT` | 0 | inclination; 0 is face-on |
+| `GALAXY_COLORS` | cosmic | `cosmic` gives a white core with cyan and blue arms; `arms` gives one hue per arm |
+
+It runs at 8 FPS and costs about 2 % of one core per monitor, more than the other scenes,
+because the whole galaxy moves every frame.
+
+### ascii.rest scenes (`ascii-pieces`)
+
+These are eight full-colour scenes from [ascii.rest](https://github.com/bas3line/ascii) by
+@bas3line, under the MIT licence. They are copied unchanged into
+`~/.local/share/ascii-pieces/pieces/`. `VERSION` names the source commit. To add more,
+copy further `src/pieces/<name>.ts` files with `category: "scenes"` into that directory.
+
+**How they are drawn.** Each scene computes a 200 × 100 grid of square cells. Each cell
+holds a dot (`·` `•` `●`) in one of the scene's palette colours. `ascii-pieces` then
+builds the picture for each terminal cell:
+
+1. It averages the dots the cell covers, after a 1-4-1 blur, so the dithering reads as a
+   tone.
+2. The brightness of that tone picks a character from the ASCII ramp ` .:-=+*#%@`.
+3. The dots' colour becomes the character's colour, in truecolor.
+4. A toned-down shade of it becomes the cell's background, so solid areas still read as
+   areas.
+
+The picture fills the window: it is scaled up and the overflow is cropped. Only changed
+characters are sent to the terminal. `wallpaper` sets kitty's font to
+`$WALLPAPER_PIECES_FONT` (default 12) for these scenes, which gives more characters and
+so more detail. The font belongs to the one kitty instance, so it follows the scene on
+the first monitor.
+
+The scenes keep their own colours and do not follow the theme's palette.
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `ASCII_PIECES_FPS` | 4 | frames per second |
+| `ASCII_PIECES_RAMP` | ` .:-=+*#%@` | characters from empty to full |
+| `ASCII_PIECES_GAMMA` | 1.6 | tone curve; above 1, dark tones stay blank |
+| `ASCII_PIECES_BG` | 0.45 | share of the tone used as the cell background; 0 means only the ground |
+
+**Cost.** On the laptop panel (1920×1200, font 12) one scene costs, in % of one core:
+
+| FPS | kitty | ascii-pieces | sway | Total |
+|---|---|---|---|---|
+| 6 | 1.9 % | 7.5 % | 2.2 % | about 12 % |
+| 4 | 1.2 % | 4.1 % | 2.0 % | about 7 % |
+| 3 | 0.9 % | 3.5 % | 2.2 % | about 7 % |
+
+Most of the cost is the scene computing itself, pixel by pixel. Two monitors cost about
+twice as much.
+
+**What was tried and dropped:**
+
+- **Half blocks (`▀`)**, two blurry "pixels" per character, looked too coarse.
+- **Real halftone dots as a bitmap through kitty's graphics protocol** looked like the
+  website but cost about 25 % CPU. Most of that was kitty taking a 7 MB image 6 times a
+  second.
+- **Edits of only the changed tiles of that bitmap** cost more than 100 %, because kitty
+  pays a lot for every single edit.
+
+If the dot look is wanted back, the better route is to pre-render each scene once into a
+looping video and play it with mpvpaper using hardware decoding. That needs mpvpaper built
+from source.
 
 ## Troubleshooting
 
@@ -164,6 +253,7 @@ If you add `<name>-light.sh`, `theme toggle` switches between the two variants.
 | Wallpaper only on one monitor | Run `wallpaper` again. The watcher restarts panels when outputs change. |
 | `theme: ... yazi flavor '...' not installed` | Run `modules/yazi.sh` or `ya pkg add yazi-rs/flavors:catppuccin-latte` (and the other flavors). |
 | `theme` fails with `wallpaper.conf missing` | Run `theme reapply`. |
+| An ascii.rest scene shows only the theme background | Check the node version (`node -v` must be at least 22.18). Look at `/run/user/$UID/wallpaper.log`. |
 | Waybar disappeared | Run `swaymsg exec 'waybar -b bar-0'`. |
 | Old colours in a terminal | foot has no live reload, so open a new window. zsh updates at the next prompt. |
 

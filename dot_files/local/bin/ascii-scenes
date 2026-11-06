@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """ascii-scenes – calm ASCII wallpapers for the kitty background panel (see `wallpaper`).
 
-    ascii-scenes night | space | forest | aquarium
+    ascii-scenes night | space | forest | aquarium | galaxy
 
 Everything is drawn in the terminal's 16 ANSI colours, so `theme` decides the palette
 (colour 0 is the background). The static scenery is drawn once; only moving things are
@@ -212,6 +212,8 @@ class Scene:
     CLOUDS = [[r"  .-~~~-.", r".(       )."], [r"   _.-~-._", r" (_______)"],
               [r"    .--.", r" .-(    ).", r"(___.__)__)"]]
 
+    fps = FPS              # frames per second while nothing fast is happening
+
     def __init__(self, cv):
         self.cv = cv
         self.ents = []
@@ -392,7 +394,7 @@ class Space(Scene):
 
     def step(self, now, dt):
         self.twinkle(3)
-        self.maybe_meteor(now, 30, 120)
+        self.maybe_meteor(now, 10, 45)
         if now >= self.next_turn:                    # the planets slowly turn
             for p in self.planets:
                 p[5] += 0.25
@@ -649,7 +651,151 @@ class Aquarium(Scene):
             self.next_jelly = now + random.uniform(150, 400)
 
 
-SCENES = {"night": Night, "space": Space, "forest": Forest, "aquarium": Aquarium}
+# ─── Rotating spiral galaxy ───────────────────────────────────────────────────
+def _env(name, default):
+    try:
+        return type(default)(os.environ.get("GALAXY_" + name, default))
+    except ValueError:
+        return default
+
+
+class Galaxy(Scene):
+    """A spiral galaxy turning in the middle of a starfield.
+
+    Tunable with GALAXY_<NAME> environment variables (defaults in brackets):
+    ARMS [3], STARS [600], SPEED degrees/s [20], SIZE % of the screen [70],
+    TWIST arm winding [0.45], NOISE scatter off the arms [0.15], GLOW core and arm
+    halo [0.45], TWINKLE star flicker [0.35], TILT 0 = face-on .. 0.8 [0],
+    COLORS "cosmic" (white core, cyan/blue arms) or "arms" (one hue per arm).
+    """
+    fps = 8
+    RAMP = " .·:-=+*#%@"
+    ASPECT = 2.0                                     # a cell is about twice as tall as wide
+
+    def build(self):
+        cv = self.cv
+        self.arms = max(1, _env("ARMS", 3))
+        n = max(10, _env("STARS", 600))
+        self.speed = math.radians(_env("SPEED", 20.0))
+        size = max(10.0, min(100.0, _env("SIZE", 70.0))) / 100
+        twist, noise = _env("TWIST", 0.45), _env("NOISE", 0.15)
+        self.glow, self.twink = _env("GLOW", 0.45), _env("TWINKLE", 0.35)
+        self.squash = math.cos(max(0.0, min(1.2, _env("TILT", 0.0))))
+        self.by_arm = _env("COLORS", "cosmic") == "arms"
+        self.cy, self.cx = (cv.h - 1) / 2, (cv.w - 1) / 2
+        self.R = size * min(cv.h / 2 / self.squash, cv.w / 2 / self.ASPECT)  # radius in rows
+
+        self.add_stars(0, cv.h, 0.012, colors=(8, 8, 8, 7, 7, 15, 6, 4))
+        self.sky = dict(cv.bg)                       # what is behind the galaxy
+        self.cells = {}                              # galaxy cells drawn last frame
+        self.angle = 0.0
+        # stars: radius 0..1, angle in the galaxy's frame, brightness, twinkle rate/phase, arm
+        self.gstars = []
+        for i in range(n):
+            if i < n * 0.22:                         # central bulge
+                r = min(1.0, abs(random.gauss(0, 0.1)))
+                a, arm = random.uniform(0, 2 * math.pi), -1
+                b = random.uniform(0.3, 0.6)
+            else:                                    # along an arm, more stars inside
+                arm = random.randrange(self.arms)
+                r = 0.06 + 0.94 * random.random() ** 1.3
+                off = random.gauss(0, noise * 0.45 + 0.02)  # sideways distance from the arm
+                a = 2 * math.pi * arm / self.arms + twist * 2 * math.pi * r + off / max(r, 0.2)
+                b = random.uniform(0.3, 0.7) * (1.15 - 0.5 * r)
+            self.gstars.append((r, a, b, random.uniform(0.5, 2.5), random.uniform(0, 6.3), arm))
+        # positions as a rotation of precomputed vectors: x = cx + ux*c + vx*s, y = cy + uy*c - vy*s
+        k = self.R
+        self.geo = [(k * self.ASPECT * r * math.cos(a), k * self.ASPECT * r * math.sin(a),
+                     k * self.squash * r * math.sin(a), k * self.squash * r * math.cos(a), r, arm)
+                    for r, a, b, _, _, arm in self.gstars]
+        self.bright = [b for _, _, b, *_ in self.gstars]
+        self.tw_next = 0
+        # the core glow is round, so it does not change as the galaxy turns
+        self.halo = {}
+        if self.glow > 0:
+            rc = max(1.5, 0.17 * self.R)
+            for dy in range(-int(2 * rc), int(2 * rc) + 1):
+                for dx in range(-int(2 * rc * self.ASPECT), int(2 * rc * self.ASPECT) + 1):
+                    d2 = (dy / self.squash) ** 2 + (dx / self.ASPECT) ** 2
+                    v = self.glow * 1.0 * math.exp(-d2 / (rc * rc))
+                    if v > 0.08:
+                        self.halo[(int(round(self.cy + dy)), int(round(self.cx + dx)))] = v
+
+    def color(self, r, arm, v):
+        if v < 0.18:
+            return 8, False
+        if self.by_arm and arm >= 0 and r > 0.12:
+            return HUES[arm % len(HUES)], v > 0.7
+        if r < 0.1:
+            return 15, True
+        if r < 0.22:
+            return 11 if v > 0.5 else 3, v > 0.6
+        if r < 0.55:
+            return 14 if v > 0.45 else 6, False
+        return 12 if v > 0.45 else 4, False
+
+    def frame(self, now):
+        """cell -> (intensity, radius of its brightest star, arm)"""
+        acc = {k: [v, 0.0, -1] for k, v in self.halo.items()}
+        cy, cx = self.cy + 0.5, self.cx + 0.5
+        c0, s0 = math.cos(self.angle), math.sin(self.angle)
+        glow, tw, bright, n = self.glow, self.twink, self.bright, len(self.gstars)
+        # twinkle: a fifth of the stars get a new brightness each frame
+        i0 = self.tw_next
+        for i in range(i0, min(n, i0 + n // 5 + 1)):
+            _, _, b, rate, ph, _ = self.gstars[i]
+            bright[i] = b * (1 - tw * 0.5 * (1 + math.sin(now * rate + ph)))
+        self.tw_next = 0 if i0 + n // 5 + 1 >= n else i0 + n // 5 + 1
+        for i, (ux, vx, uy, vy, r, arm) in enumerate(self.geo):
+            x = int(cx + ux * c0 + vx * s0)
+            y = int(cy + uy * c0 - vy * s0)
+            v = bright[i]
+            c = acc.get((y, x))
+            if c is None:
+                acc[(y, x)] = [v, r, arm]
+            else:
+                c[0] += v
+                if c[2] < 0 or v > 0.4:
+                    c[1], c[2] = r, arm
+            if glow > 0:                             # faint halo beside each star (cells are tall)
+                h = v * glow * 0.35
+                for k in ((y, x - 1), (y, x + 1)):
+                    c = acc.get(k)
+                    if c is None:
+                        acc[k] = [h, r, arm]
+                    else:
+                        c[0] += h
+        return acc
+
+    def step(self, now, dt):
+        self.angle += self.speed * dt
+        cv, ramp = self.cv, self.RAMP
+        new = {}
+        for (y, x), (v, r, arm) in self.frame(now).items():
+            if not cv.inside(y, x) or v < 0.09:
+                continue
+            v = min(1.0, v)
+            fg, bold = self.color(r, arm, v)
+            new[(y, x)] = (ramp[max(1, int(v * (len(ramp) - 1) + 0.5))], fg, bold)
+        for k in self.cells.keys() - new.keys():       # left behind: the sky again
+            ch, fg, bold = self.sky.get(k, (" ", 7, False))
+            cv.set_bg(k[0], k[1], ch, fg, bold)
+        for k, cell in new.items():
+            if self.cells.get(k) != cell:
+                cv.set_bg(k[0], k[1], *cell)
+        self.cells = new
+        for _ in range(2):                           # background stars twinkle, not under the galaxy
+            if self.stars:
+                y, x, c = random.choice(self.stars)
+                if (y, x) not in new:
+                    ch = random.choice("..··*+")
+                    self.sky[(y, x)] = (ch, 15 if ch in "*+" and random.random() < 0.3 else c, False)
+                    cv.set_bg(y, x, *self.sky[(y, x)])
+        self.maybe_meteor(now, 40, 150)
+
+
+SCENES = {"night": Night, "space": Space, "forest": Forest, "aquarium": Aquarium,
+          "galaxy": Galaxy}
 
 
 def main(scr, scene_cls):
@@ -668,7 +814,7 @@ def main(scr, scene_cls):
             curses.update_lines_cols()
             scr.clear()
             scene = scene_cls(Canvas(scr))
-        time.sleep(1 / (FAST_FPS if scene.fast else FPS))
+        time.sleep(1 / (FAST_FPS if scene.fast else scene.fps))
 
 
 if __name__ == "__main__":
