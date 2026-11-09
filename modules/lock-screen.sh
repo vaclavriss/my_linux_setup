@@ -8,12 +8,13 @@ source "$SCRIPT_DIR/common.sh"
 # Animated lock screen (`lock-wallpaper`, Mod4+x): the wallpaper scene behind the lock and an
 # ASCII password box in the theme's colours. See docs/theme-and-wallpaper.md ("Lock screen").
 # Builds, at pinned revisions, into ~/.local/src and installs into ~/.local/bin:
-#   swaylock-plugin  github.com/mstoeckl/swaylock-plugin + patches/swaylock-plugin-ascii-indicator.patch
+#   swaylock-plugin  github.com/vaclavriss/swaylock-plugin, branch ascii-indicator: a fork of
+#                    github.com/mstoeckl/swaylock-plugin with the ASCII password box
 #   windowtolayer    gitlab.freedesktop.org/mstoeckl/windowtolayer (lets kitty draw on the lock)
 # Run after theme-wallpaper (needs kitty, `wallpaper` and the palettes).
 # Without these two programs lock-wallpaper falls back to plain swaylock.
 
-SWAYLOCK_PLUGIN_REV=fb0eeb6fac9c7daf934c9e7468eb4eeb9f8c22ef
+SWAYLOCK_PLUGIN_REV=5b64f0a88ad602c3d9bbad98c7091262a9a65704   # ascii-indicator, on upstream fb0eeb6
 WINDOWTOLAYER_REV=8bc8f30f9bb63ec2a88b3c689cc52e1c52de063c
 WAYLAND_PROTOCOLS_TAG=1.50   # swaylock-plugin needs >= 1.47, Ubuntu 24.04 ships 1.45
 SRC="$HOME/.local/src"
@@ -31,9 +32,9 @@ fi
 # fetch <url> <dir> <rev>: clone once, then check out the pinned revision
 fetch() {
     [[ -d $2/.git ]] || git clone -q "$1" "$2"
+    git -C "$2" remote set-url origin "$1"   # e.g. switched from upstream to the fork
     git -C "$2" fetch -q origin "$3" 2>/dev/null || git -C "$2" fetch -q origin
     git -C "$2" -c advice.detachedHead=false checkout -q --force "$3"
-    git -C "$2" reset -q --hard   # drop a patch applied by an earlier run
 }
 
 mkdir -p "$SRC" "$HOME/.local/bin"
@@ -42,10 +43,9 @@ mkdir -p "$SRC" "$HOME/.local/bin"
 (
     set -e
     D="$SRC/swaylock-plugin"
-    fetch https://github.com/mstoeckl/swaylock-plugin.git "$D" "$SWAYLOCK_PLUGIN_REV"
-    git -C "$D" apply "$REPO_DIR/patches/swaylock-plugin-ascii-indicator.patch"
+    fetch https://github.com/vaclavriss/swaylock-plugin.git "$D" "$SWAYLOCK_PLUGIN_REV"
     if [[ ! -d $D/subprojects/wayland-protocols ]]; then
-        git clone -q --depth 1 --branch "$WAYLAND_PROTOCOLS_TAG" \
+        git -c advice.detachedHead=false clone -q --depth 1 --branch "$WAYLAND_PROTOCOLS_TAG" \
             https://gitlab.freedesktop.org/wayland/wayland-protocols.git "$D/subprojects/wayland-protocols"
     fi
     rm -rf "$D/build"

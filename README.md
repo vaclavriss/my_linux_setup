@@ -8,7 +8,6 @@ Useful tools that accelerates me to be more effective.
 | `install.sh` | runs the modules below in order |
 | `modules/` | `basic` → `zsh` → `pet` → `nvim` → `git-tmux` → `sway-waybar-wofi` → `yazi` → `theme-wallpaper` → `lock-screen` → `utils` |
 | `dot_files/` | configs, installed to `~` (`.config/` → `~/.config/`, `local/bin/` → `~/.local/bin/`) |
-| `patches/` | local changes to programs built from source (swaylock-plugin) |
 | `docs/` | how things work and how to set them up again |
 | `backups/` | original configs from before larger changes, for restoring the old look |
 | `pet/` | pet binary |

@@ -8,13 +8,13 @@
 # swaylock-plugin runs the scene as its background: windowtolayer turns kitty's window
 # into a background layer, kitty uses the theme's colours (~/.config/kitty/wallpaper.conf).
 # The scene is the one on the first monitor (`wallpaper _cmd`).
-# Instead of the ring it draws an ASCII box in the theme's colours (patched render.c);
+# Instead of the ring it draws an ASCII box in the theme's colours (fork vaclavriss/swaylock-plugin);
 # LOCK_IDLE_VISIBLE=1 shows it before the first key press, LOCK_FONT_SIZE sets its size (20).
 # --test unlocks with SIGUSR1, which makes swaylock-plugin unlock cleanly and exit. The
 # timer is its own process, so it fires even if this script is killed.
 set -euo pipefail
 
-# built by modules/lock-screen.sh (swaylock-plugin with the ASCII indicator patch, windowtolayer)
+# built by modules/lock-screen.sh (swaylock-plugin fork with the ASCII indicator, windowtolayer)
 LOCKER=${SWAYLOCK_PLUGIN:-$HOME/.local/bin/swaylock-plugin}
 W2L=${WINDOWTOLAYER:-$HOME/.local/bin/windowtolayer}
 KITTY="$HOME/.local/kitty.app/bin/kitty"
@@ -39,7 +39,7 @@ for f in "$LOCKER" "$W2L" "$KITTY"; do
   fi
 done
 
-# ASCII indicator (patched swaylock-plugin, SWAYLOCK_ASCII=1) in the theme's colours
+# ASCII indicator (swaylock-plugin fork, SWAYLOCK_ASCII=1) in the theme's colours
 PALETTE="$HOME/.config/themes/palettes/$(cat "$HOME/.config/themes/current" 2>/dev/null || echo steel).sh"
 TERM_BG="#000000" TERM_FG="#ffffff" ACCENT="#8888ff" FADE="#888888" URGENT="#ff5555" WARN="#ffcc00"
 # shellcheck disable=SC1090

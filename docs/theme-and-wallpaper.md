@@ -76,7 +76,7 @@ Sources, kept in this repo:
 | `dot_files/local/share/ascii-pieces/` | `~/.local/share/ascii-pieces/` | 8 ascii.rest scenes, unchanged, with their MIT licence and source commit |
 | `dot_files/local/bin/asciiquarium` | `~/.local/bin/asciiquarium` | wrapper for the downloaded asciiquarium |
 | `dot_files/local/bin/lock-wallpaper` | `~/.local/bin/lock-wallpaper` | lock screen with the wallpaper scene (Mod4+x) |
-| `patches/swaylock-plugin-ascii-indicator.patch` | built into `~/.local/bin/swaylock-plugin` | ASCII password box instead of the ring |
+| [vaclavriss/swaylock-plugin](https://github.com/vaclavriss/swaylock-plugin/tree/ascii-indicator) (branch `ascii-indicator`) | built into `~/.local/bin/swaylock-plugin` | fork with the ASCII password box instead of the ring |
 | `dot_files/.config/themes/palettes/*.sh` | `~/.config/themes/palettes/` | the palettes; roles documented in `steel.sh` |
 | `dot_files/.config/themes/yazi-icons.txt` | `~/.config/themes/` | yazi's built-in icons with their original colours, recoloured by hue |
 | `dot_files/.tmux.conf` | `~/.tmux.conf` | waybar-like pills; colours via `source-file ~/.config/tmux/theme.conf` |
@@ -307,7 +307,8 @@ swaylock-plugin  →  windowtolayer  →  kitty (wallpaper.conf)  →  scene (`w
   kitty a normal window and hands it to the lock as a background layer.
 - `wallpaper _cmd` prints the command and font of the first monitor's scene, so the lock
   shows the same scene as the desktop. `static` mode shows the galaxy.
-- `patches/swaylock-plugin-ascii-indicator.patch` changes two things:
+- The fork [vaclavriss/swaylock-plugin](https://github.com/vaclavriss/swaylock-plugin), branch
+  `ascii-indicator`, adds one commit to upstream `fb0eeb6`. It changes two things:
   - `render.c`: with `SWAYLOCK_ASCII=1` the ring is drawn as a text box. All states are kept
     and use the ring's colour options:
 
@@ -352,9 +353,23 @@ swaylock-plugin  →  windowtolayer  →  kitty (wallpaper.conf)  →  scene (`w
   The timer is a separate process.
 - **PAM.** `modules/lock-screen.sh` installs `/etc/pam.d/swaylock-plugin`. Without it, PAM
   uses `/etc/pam.d/other`, which on Ubuntu checks the password like a normal login.
-- **Updates.** The two programs are built from source, so they get no updates from apt. To
-  update, change `SWAYLOCK_PLUGIN_REV` / `WINDOWTOLAYER_REV` in `modules/lock-screen.sh`
-  (and refresh the patch if it no longer applies), then run `bash modules/lock-screen.sh`.
+- **Updates.** The two programs are built from source, so they get no updates from apt.
+  - windowtolayer: change `WINDOWTOLAYER_REV` in `modules/lock-screen.sh`.
+  - swaylock-plugin: rebase the fork's `ascii-indicator` branch onto a newer upstream and
+    push it:
+
+    ```sh
+    cd ~/.local/src/swaylock-plugin
+    git remote add upstream https://github.com/mstoeckl/swaylock-plugin.git
+    git fetch upstream
+    git switch -c ascii-indicator --track origin/ascii-indicator
+    git rebase upstream/main
+    git push --force-with-lease git@github.com:vaclavriss/swaylock-plugin.git ascii-indicator
+    ```
+
+    Then put the new commit into `SWAYLOCK_PLUGIN_REV`.
+
+  Then run `bash modules/lock-screen.sh`.
 
 ### Building
 
