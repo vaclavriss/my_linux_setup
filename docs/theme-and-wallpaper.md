@@ -19,7 +19,7 @@ theme yazi-icons      # re-extract yazi's icon glyphs (after a yazi upgrade)
 
 wallpaper             # start the saved mode (sway runs this at login)
 wallpaper theme       # the palette's scenes, one per monitor, rotating every 30 min
-wallpaper space       # one scene everywhere: bonsai night space forest aquarium galaxy
+wallpaper space       # one scene everywhere: bonsai night space forest aquarium galaxy galaxy-ember ...
                       #                       asciiquarium cmatrix static
 wallpaper saturn-rise # an ascii.rest scene (see below): alpine-dawn aurora-fjord
                       # desert-night earthrise kyoto-dusk lantern-lake misty-forest saturn-rise
@@ -71,7 +71,7 @@ Sources, kept in this repo:
 |---|---|---|
 | `dot_files/local/bin/theme` | `~/.local/bin/theme` | generator + reloader |
 | `dot_files/local/bin/wallpaper` | `~/.local/bin/wallpaper` | kitty background panels, per-monitor scenes, rotation, hot-plug |
-| `dot_files/local/bin/ascii-scenes` | `~/.local/bin/ascii-scenes` | Python/curses scenes: night, space, forest, aquarium, galaxy |
+| `dot_files/local/bin/ascii-scenes` | `~/.local/bin/ascii-scenes` | Python/curses scenes: night, space, forest, aquarium, galaxy and its `galaxy-*` variants |
 | `dot_files/local/bin/ascii-pieces` | `~/.local/bin/ascii-pieces` | Node player for the ascii.rest scenes, as coloured ASCII |
 | `dot_files/local/share/ascii-pieces/` | `~/.local/share/ascii-pieces/` | 8 ascii.rest scenes, unchanged, with their MIT licence and source commit |
 | `dot_files/local/bin/asciiquarium` | `~/.local/bin/asciiquarium` | wrapper for the downloaded asciiquarium |
@@ -182,11 +182,40 @@ so this is a new implementation. Set the parameters with environment variables:
 | `GALAXY_NOISE` | 0.15 | scatter of stars off the arms |
 | `GALAXY_GLOW` | 0.45 | core and arm halo |
 | `GALAXY_TWINKLE` | 0.35 | star flicker |
-| `GALAXY_TILT` | 0 | inclination; 0 is face-on |
-| `GALAXY_COLORS` | cosmic | `cosmic` gives a white core with cyan and blue arms; `arms` gives one hue per arm |
+| `GALAXY_TILT` | 0 | inclination; 0 is face-on, up to 1.2 |
+| `GALAXY_COLORS` | cosmic | colour scheme, see below |
 
-It runs at 8 FPS and costs about 2 % of one core per monitor, more than the other scenes,
-because the whole galaxy moves every frame.
+The colour schemes use the palette's ANSI colours, so they follow the theme. They are listed
+from the core outwards:
+
+| Scheme | Colours |
+|---|---|
+| `cosmic` | white, gold, cyan, blue |
+| `ember` | white, gold, red, magenta |
+| `nebula` | white, magenta, blue, cyan |
+| `andromeda` | white, gold, grey, blue |
+| `emerald` | white, gold, green, cyan |
+| `frost` | white, cyan, blue |
+| `arms` | one hue per arm |
+
+Named variants are their own scenes, for example `wallpaper galaxy-ember`. They can also go in
+a palette's `WALLPAPERS` list. A variant sets only some parameters; the rest keep the defaults
+above. `GALAXY_*` variables still override everything. The variants are defined in
+`GALAXY_VARIANTS` in `ascii-scenes`.
+
+| Scene | Look | Settings |
+|---|---|---|
+| `galaxy` | three cyan/blue arms | the defaults |
+| `galaxy-ember` | two long warm arms | arms 2, twist 0.6, speed 15, glow 0.55, `ember` |
+| `galaxy-nebula` | four loose, cloudy arms | arms 4, stars 800, noise 0.32, glow 0.6, speed 12, `nebula` |
+| `galaxy-andromeda` | big, seen at an angle, slow | arms 2, twist 0.7, size 80, tilt 1.05, stars 650, speed 10, `andromeda` |
+| `galaxy-emerald` | five thin green arms | arms 5, twist 0.35, noise 0.1, `emerald` |
+| `galaxy-whirlpool` | two tightly wound arms, fast | arms 2, twist 0.95, noise 0.08, speed 30, size 60, `frost` |
+| `galaxy-rainbow` | six arms, one colour each | arms 6, twist 0.5, stars 750, `arms` |
+
+It runs at 8 FPS, more than the other scenes, because the whole galaxy moves every frame.
+On a live panel the plain galaxy cost about 2 % of one core per monitor. In a tmux test
+window it was 3–4 %, and the bigger variants (andromeda, rainbow) were 5–6 %.
 
 ### ascii.rest scenes (`ascii-pieces`)
 

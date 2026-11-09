@@ -29,7 +29,7 @@ Two commands drive the look:
   and nvim at once.
 - `wallpaper` runs calm ASCII scenes, colour-matched to the palette, behind a translucent
   foot: bonsai, forest animals, planets and meteors, night sky over mountains, aquarium,
-  a rotating galaxy, and eight full-colour ascii.rest scenes drawn as coloured ASCII.
+  a rotating galaxy (in several `galaxy-*` variants), and eight full-colour ascii.rest scenes drawn as coloured ASCII.
 
 See [docs/theme-and-wallpaper.md](docs/theme-and-wallpaper.md).
 

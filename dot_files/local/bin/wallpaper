@@ -11,7 +11,8 @@
 #   wallpaper reload         re-read colours and the theme's scenes (called by `theme`)
 #   wallpaper stop
 #
-# Scenes: bonsai (cbonsai), night, space, forest, aquarium, galaxy (ascii-scenes), asciiquarium,
+# Scenes: bonsai (cbonsai), night, space, forest, aquarium, galaxy and its variants galaxy-ember,
+# -nebula, -andromeda, -emerald, -whirlpool, -rainbow (ascii-scenes), asciiquarium,
 # cmatrix, the ascii.rest scenes in ~/.local/share/ascii-pieces/pieces/ (ascii-pieces: coloured
 # ASCII in their own colours, not the theme's, font $WALLPAPER_PIECES_FONT (12), ~5-10 % CPU
 # per monitor), plus any executable in ~/.config/wallpaper/.
@@ -32,7 +33,8 @@ RUN="${XDG_RUNTIME_DIR:-/run/user/$(id -u)}"
 SOCK="$RUN/kitty-wallpaper.sock"     # kitty remote control (kitty appends -<pid>), adds panels
 ROTATE=${WALLPAPER_ROTATE:-30}
 PIECES_FONT=${WALLPAPER_PIECES_FONT:-12}   # smaller font for the ascii.rest scenes: more characters, more detail
-BUILTIN="bonsai night space forest aquarium galaxy asciiquarium cmatrix"
+SCENES_PY=$("$HOME/.local/bin/ascii-scenes" list 2>/dev/null | tr '\n' ' ')   # night space ... galaxy galaxy-<variant>
+BUILTIN="bonsai ${SCENES_PY}asciiquarium cmatrix"
 
 die() { echo "wallpaper: $*" >&2; exit 1; }
 
@@ -48,10 +50,10 @@ cmd_for() {
   local env=""; light && env="env SCENE_LIGHT=1 "
   case $1 in
     bonsai|cbonsai) echo "cbonsai --live --infinite --time=0.08 --wait=8 --base=1" ;;
-    night|space|forest|aquarium|galaxy) echo "${env}$HOME/.local/bin/ascii-scenes $1" ;;
     asciiquarium) echo "$HOME/.local/bin/asciiquarium" ;;
     cmatrix)      echo "cmatrix -b -u 8" ;;
-    *)            if [[ -f $PIECES/$1.ts ]]; then echo "$HOME/.local/bin/ascii-pieces $1"
+    *)            if [[ " $SCENES_PY " == *" $1 "* ]]; then echo "${env}$HOME/.local/bin/ascii-scenes $1"
+                  elif [[ -f $PIECES/$1.ts ]]; then echo "$HOME/.local/bin/ascii-pieces $1"
                   elif [[ -x $CUSTOM/$1 && ! -d $CUSTOM/$1 ]]; then echo "$CUSTOM/$1"
                   else return 1; fi ;;
   esac

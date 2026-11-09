@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """ascii-scenes – calm ASCII wallpapers for the kitty background panel (see `wallpaper`).
 
-    ascii-scenes night | space | forest | aquarium | galaxy
+    ascii-scenes night | space | forest | aquarium | galaxy | galaxy-<variant> | list
 
 Everything is drawn in the terminal's 16 ANSI colours, so `theme` decides the palette
 (colour 0 is the background). The static scenery is drawn once; only moving things are
@@ -652,7 +652,36 @@ class Aquarium(Scene):
 
 
 # ─── Rotating spiral galaxy ───────────────────────────────────────────────────
-def _env(name, default):
+# Named variants: `ascii-scenes galaxy-<name>`. Each sets some parameters; the rest keep
+# the defaults of the plain galaxy, and GALAXY_<NAME> variables still override everything.
+GALAXY_VARIANTS = {
+    "galaxy":           {},
+    "galaxy-ember":     {"ARMS": 2, "TWIST": 0.6, "SPEED": 15.0, "GLOW": 0.55, "COLORS": "ember"},
+    "galaxy-nebula":    {"ARMS": 4, "STARS": 800, "NOISE": 0.32, "GLOW": 0.6, "SPEED": 12.0,
+                         "COLORS": "nebula"},
+    "galaxy-andromeda": {"ARMS": 2, "TWIST": 0.7, "SIZE": 80.0, "TILT": 1.05, "STARS": 650,
+                         "SPEED": 10.0, "COLORS": "andromeda"},
+    "galaxy-emerald":   {"ARMS": 5, "TWIST": 0.35, "NOISE": 0.1, "COLORS": "emerald"},
+    "galaxy-whirlpool": {"ARMS": 2, "TWIST": 0.95, "NOISE": 0.08, "SPEED": 30.0, "SIZE": 60.0,
+                         "COLORS": "frost"},
+    "galaxy-rainbow":   {"ARMS": 6, "TWIST": 0.5, "STARS": 750, "COLORS": "arms"},
+}
+
+# colour zones from the core outwards: (up to radius, bright colour, dim colour), ANSI indices,
+# so every scheme follows the active palette
+GALAXY_COLORS = {
+    "cosmic":    [(0.1, 15, 15), (0.22, 11, 3), (0.55, 14, 6), (9, 12, 4)],   # white, gold, cyan, blue
+    "ember":     [(0.1, 15, 15), (0.25, 11, 3), (0.55, 9, 1), (9, 13, 5)],    # white, gold, red, magenta
+    "nebula":    [(0.1, 15, 15), (0.22, 13, 5), (0.55, 12, 4), (9, 14, 6)],   # white, magenta, blue, cyan
+    "andromeda": [(0.12, 15, 15), (0.3, 11, 3), (0.6, 7, 8), (9, 12, 4)],     # white, gold, grey, blue
+    "emerald":   [(0.1, 15, 15), (0.22, 11, 3), (0.55, 10, 2), (9, 14, 6)],   # white, gold, green, cyan
+    "frost":     [(0.15, 15, 15), (0.45, 14, 6), (9, 12, 4)],                 # white, cyan, blue
+}
+
+
+def _env(name, default, preset=None):
+    if preset and name in preset:
+        default = type(default)(preset[name])
     try:
         return type(default)(os.environ.get("GALAXY_" + name, default))
     except ValueError:
@@ -674,14 +703,17 @@ class Galaxy(Scene):
 
     def build(self):
         cv = self.cv
-        self.arms = max(1, _env("ARMS", 3))
-        n = max(10, _env("STARS", 600))
-        self.speed = math.radians(_env("SPEED", 20.0))
-        size = max(10.0, min(100.0, _env("SIZE", 70.0))) / 100
-        twist, noise = _env("TWIST", 0.45), _env("NOISE", 0.15)
-        self.glow, self.twink = _env("GLOW", 0.45), _env("TWINKLE", 0.35)
-        self.squash = math.cos(max(0.0, min(1.2, _env("TILT", 0.0))))
-        self.by_arm = _env("COLORS", "cosmic") == "arms"
+        p = self.PRESET
+        self.arms = max(1, _env("ARMS", 3, p))
+        n = max(10, _env("STARS", 600, p))
+        self.speed = math.radians(_env("SPEED", 20.0, p))
+        size = max(10.0, min(100.0, _env("SIZE", 70.0, p))) / 100
+        twist, noise = _env("TWIST", 0.45, p), _env("NOISE", 0.15, p)
+        self.glow, self.twink = _env("GLOW", 0.45, p), _env("TWINKLE", 0.35, p)
+        self.squash = math.cos(max(0.0, min(1.2, _env("TILT", 0.0, p))))
+        colors = _env("COLORS", "cosmic", p)
+        self.by_arm = colors == "arms"
+        self.zones = GALAXY_COLORS.get(colors, GALAXY_COLORS["cosmic"])
         self.cy, self.cx = (cv.h - 1) / 2, (cv.w - 1) / 2
         self.R = size * min(cv.h / 2 / self.squash, cv.w / 2 / self.ASPECT)  # radius in rows
 
@@ -726,13 +758,14 @@ class Galaxy(Scene):
             return 8, False
         if self.by_arm and arm >= 0 and r > 0.12:
             return HUES[arm % len(HUES)], v > 0.7
-        if r < 0.1:
-            return 15, True
-        if r < 0.22:
-            return 11 if v > 0.5 else 3, v > 0.6
-        if r < 0.55:
-            return 14 if v > 0.45 else 6, False
-        return 12 if v > 0.45 else 4, False
+        for i, (rmax, hi, lo) in enumerate(self.zones):
+            if r < rmax:
+                if i == 0:
+                    return hi, True
+                if i == 1:
+                    return (hi if v > 0.5 else lo), v > 0.6
+                return (hi if v > 0.45 else lo), False
+        return self.zones[-1][2], False
 
     def frame(self, now):
         """cell -> (intensity, radius of its brightest star, arm)"""
@@ -794,8 +827,9 @@ class Galaxy(Scene):
         self.maybe_meteor(now, 40, 150)
 
 
-SCENES = {"night": Night, "space": Space, "forest": Forest, "aquarium": Aquarium,
-          "galaxy": Galaxy}
+SCENES = {"night": Night, "space": Space, "forest": Forest, "aquarium": Aquarium}
+SCENES.update({name: type(name, (Galaxy,), {"PRESET": preset})
+               for name, preset in GALAXY_VARIANTS.items()})
 
 
 def main(scr, scene_cls):
@@ -818,6 +852,9 @@ def main(scr, scene_cls):
 
 
 if __name__ == "__main__":
+    if sys.argv[1:] == ["list"]:
+        print(*SCENES, sep="\n")
+        sys.exit()
     if len(sys.argv) != 2 or sys.argv[1] not in SCENES:
         sys.exit(__doc__)
     try:
