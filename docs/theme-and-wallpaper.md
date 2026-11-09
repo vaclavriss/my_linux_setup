@@ -381,7 +381,7 @@ swaylock-plugin  →  windowtolayer  →  kitty (wallpaper.conf)  →  scene (`w
 | An ascii.rest scene shows only the theme background | Check the node version (`node -v` must be at least 22.18). Look at `/run/user/$UID/wallpaper.log`. |
 | `Mod4+x` shows plain swaylock instead of the scene | `lock-wallpaper` found no `~/.local/bin/swaylock-plugin` or `windowtolayer`, so run `bash modules/lock-screen.sh`. |
 | Screen stays locked with no password prompt | Switch to a console (Ctrl+Alt+F3), log in and run `pkill -USR1 swaylock-plugin`. |
-| Waybar disappeared | Run `swaymsg exec 'waybar -b bar-0'`. |
+| Waybar disappeared, or there are two | Run `pkill -x waybar; swaymsg reload`. Sway starts one waybar again. |
 | Old colours in a terminal | foot has no live reload, so open a new window. zsh updates at the next prompt. |
 
 ## Restoring the old look

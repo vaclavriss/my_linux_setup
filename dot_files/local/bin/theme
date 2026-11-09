@@ -422,13 +422,15 @@ echo "${WALLPAPERS[*]}" > "$THEMES/current-wallpapers"
 echo "$name" > "$CURRENT_FILE"
 
 # ─── Reload what is running ──────────────────────────────────────────────────
-swaymsg reload >/dev/null 2>&1 || true
-# waybar 0.9 can crash on SIGUSR2 (wireplumber module re-init), so restart it instead
+# waybar: sway starts it (`swaybar_command waybar`) and replaces it on every reload, which
+# also loads the new colours. Not SIGUSR2 (waybar 0.9 can crash on it), and no
+# `swaymsg exec waybar`: sway does not manage such a bar, so the next reload adds a second.
+# Strays from earlier versions of this script go first.
 if pgrep -x waybar >/dev/null; then
   pkill -x waybar
   for _ in {1..20}; do pgrep -x waybar >/dev/null || break; sleep 0.1; done
-  swaymsg exec 'waybar -b bar-0' >/dev/null 2>&1 || true
 fi
+swaymsg reload >/dev/null 2>&1 || true
 for sock in "${TMUX_TMPDIR:-/tmp}/tmux-$(id -u)"/*; do
   [[ -S $sock ]] && tmux -S "$sock" source-file "$HOME/.config/tmux/theme.conf" 2>/dev/null || true
 done
