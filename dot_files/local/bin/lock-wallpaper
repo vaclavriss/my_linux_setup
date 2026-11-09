@@ -1,0 +1,77 @@
+#!/usr/bin/env bash
+# lock-wallpaper – lock the screen with the current wallpaper scene animated behind it.
+#
+#   lock-wallpaper              lock; unlock with your password
+#   lock-wallpaper --test [N]   lock and unlock by itself after N seconds (default 20)
+#   lock-wallpaper -h
+#
+# swaylock-plugin runs the scene as its background: windowtolayer turns kitty's window
+# into a background layer, kitty uses the theme's colours (~/.config/kitty/wallpaper.conf).
+# The scene is the one on the first monitor (`wallpaper _cmd`).
+# Instead of the ring it draws an ASCII box in the theme's colours (patched render.c);
+# LOCK_IDLE_VISIBLE=1 shows it before the first key press, LOCK_FONT_SIZE sets its size (20).
+# --test unlocks with SIGUSR1, which makes swaylock-plugin unlock cleanly and exit. The
+# timer is its own process, so it fires even if this script is killed.
+set -euo pipefail
+
+# built by modules/lock-screen.sh (swaylock-plugin with the ASCII indicator patch, windowtolayer)
+LOCKER=${SWAYLOCK_PLUGIN:-$HOME/.local/bin/swaylock-plugin}
+W2L=${WINDOWTOLAYER:-$HOME/.local/bin/windowtolayer}
+KITTY="$HOME/.local/kitty.app/bin/kitty"
+CONF="$HOME/.config/kitty/wallpaper.conf"
+
+test_secs=""
+case "${1:-}" in
+  "") ;;
+  --test) test_secs=${2:-20}; [[ $test_secs =~ ^[0-9]+$ ]] || { echo "lock-wallpaper: --test takes seconds" >&2; exit 2; } ;;
+  -h|--help) sed -n '2,/^set -euo/{/^#/s/^# \{0,1\}//p}' "$0"; exit ;;
+  *) echo "lock-wallpaper: unknown option '$1' (see -h)" >&2; exit 2 ;;
+esac
+
+# a second Mod4+x while locked does nothing
+pgrep -u "$USER" -x swaylock-plugin >/dev/null && exit 0
+
+# never leave the screen unlocked: without the parts fall back to plain swaylock
+for f in "$LOCKER" "$W2L" "$KITTY"; do
+  if [[ ! -x $f ]]; then
+    echo "lock-wallpaper: $f not found, using swaylock" >&2
+    exec swaylock -f -c 000000
+  fi
+done
+
+# ASCII indicator (patched swaylock-plugin, SWAYLOCK_ASCII=1) in the theme's colours
+PALETTE="$HOME/.config/themes/palettes/$(cat "$HOME/.config/themes/current" 2>/dev/null || echo steel).sh"
+TERM_BG="#000000" TERM_FG="#ffffff" ACCENT="#8888ff" FADE="#888888" URGENT="#ff5555" WARN="#ffcc00"
+# shellcheck disable=SC1090
+[[ -f $PALETTE ]] && source "$PALETTE"
+lock_font=$(sed -n 's/^font_family *//p' "$CONF" 2>/dev/null); lock_font=${lock_font:-monospace}
+c() { echo "${1#\#}${2:-ff}"; }
+look=(--font "$lock_font" --font-size "${LOCK_FONT_SIZE:-20}"
+  --inside-color "$(c "$TERM_BG" f5)" --inside-ver-color "$(c "$TERM_BG" f5)"
+  --inside-wrong-color "$(c "$TERM_BG" f5)" --inside-clear-color "$(c "$TERM_BG" f5)"
+  --inside-caps-lock-color "$(c "$TERM_BG" f5)"
+  --ring-color "$(c "$FADE")" --ring-ver-color "$(c "$ACCENT")" --ring-wrong-color "$(c "$URGENT")"
+  --ring-clear-color "$(c "$WARN")" --ring-caps-lock-color "$(c "$WARN")"
+  --line-color "$(c "$FADE" 99)" --line-ver-color "$(c "$ACCENT" 99)" --line-wrong-color "$(c "$URGENT" 99)"
+  --line-clear-color "$(c "$WARN" 99)" --line-caps-lock-color "$(c "$WARN" 99)"
+  --text-color "$(c "$FADE")" --text-ver-color "$(c "$ACCENT")" --text-wrong-color "$(c "$URGENT")"
+  --text-clear-color "$(c "$WARN")" --text-caps-lock-color "$(c "$WARN")"
+  --key-hl-color "$(c "$ACCENT")" --bs-hl-color "$(c "$URGENT")"
+  --caps-lock-key-hl-color "$(c "$WARN")" --caps-lock-bs-hl-color "$(c "$URGENT")"
+  --layout-text-color "$(c "$TERM_FG")" --show-failed-attempts)
+[[ ${LOCK_IDLE_VISIBLE:-0} == 1 ]] && look+=(--indicator-idle-visible)
+
+IFS=$'\t' read -r font cmd < <("$HOME/.local/bin/wallpaper" _cmd)
+opts=""; [[ $font != - ]] && opts="-o font_size=$font"
+
+SWAYLOCK_ASCII=1 "$LOCKER" "${look[@]}" --command-each "$W2L -m -a top,bottom,left,right -s 0x0 -- $KITTY --config=$CONF $opts $cmd" &
+pid=$!
+
+if [[ -n $test_secs ]]; then
+  # unlock only if that pid is still our locker
+  setsid bash -c 'sleep "$1"; grep -qa swaylock-plugin "/proc/$2/cmdline" 2>/dev/null && kill -USR1 "$2"' \
+    _ "$test_secs" "$pid" >/dev/null 2>&1 &
+  echo "lock-wallpaper: test lock, unlocks by itself in $test_secs s" >&2
+fi
+# a crash leaves sway locked with no prompt: plain swaylock takes the lock over
+wait "$pid" || exec swaylock -f -c 000000

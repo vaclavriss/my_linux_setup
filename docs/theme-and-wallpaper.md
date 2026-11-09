@@ -75,6 +75,8 @@ Sources, kept in this repo:
 | `dot_files/local/bin/ascii-pieces` | `~/.local/bin/ascii-pieces` | Node player for the ascii.rest scenes, as coloured ASCII |
 | `dot_files/local/share/ascii-pieces/` | `~/.local/share/ascii-pieces/` | 8 ascii.rest scenes, unchanged, with their MIT licence and source commit |
 | `dot_files/local/bin/asciiquarium` | `~/.local/bin/asciiquarium` | wrapper for the downloaded asciiquarium |
+| `dot_files/local/bin/lock-wallpaper` | `~/.local/bin/lock-wallpaper` | lock screen with the wallpaper scene (Mod4+x) |
+| `patches/swaylock-plugin-ascii-indicator.patch` | built into `~/.local/bin/swaylock-plugin` | ASCII password box instead of the ring |
 | `dot_files/.config/themes/palettes/*.sh` | `~/.config/themes/palettes/` | the palettes; roles documented in `steel.sh` |
 | `dot_files/.config/themes/yazi-icons.txt` | `~/.config/themes/` | yazi's built-in icons with their original colours, recoloured by hue |
 | `dot_files/.tmux.conf` | `~/.tmux.conf` | waybar-like pills; colours via `source-file ~/.config/tmux/theme.conf` |
@@ -274,6 +276,100 @@ If the dot look is wanted back, the better route is to pre-render each scene onc
 looping video and play it with mpvpaper using hardware decoding. That needs mpvpaper built
 from source.
 
+## Lock screen
+
+`Mod4+x` runs `lock-wallpaper`. It locks the screen with the first monitor's wallpaper scene
+animated behind the lock and an ASCII password box in the palette's colours:
+
+```
++---------------------------------+
+|   . . . . . # # # . . . . . .   |
+|            verifying ...         |
++---------------------------------+
+```
+
+```sh
+lock-wallpaper --test 20     # lock, then unlock by itself after 20 s (password works too)
+LOCK_IDLE_VISIBLE=1 lock-wallpaper   # show the box before the first key press
+LOCK_FONT_SIZE=24 lock-wallpaper     # bigger box (default 20)
+```
+
+### How it works
+
+```
+swaylock-plugin  →  windowtolayer  →  kitty (wallpaper.conf)  →  scene (`wallpaper _cmd`)
+```
+
+- [swaylock-plugin](https://github.com/mstoeckl/swaylock-plugin) is a swaylock fork. It runs
+  a wallpaper program behind the lock, once per output (`--command-each`).
+- kitty refuses to start without xdg-shell, even as a panel, and swaylock-plugin offers only
+  layer-shell. [windowtolayer](https://gitlab.freedesktop.org/mstoeckl/windowtolayer) gives
+  kitty a normal window and hands it to the lock as a background layer.
+- `wallpaper _cmd` prints the command and font of the first monitor's scene, so the lock
+  shows the same scene as the desktop. `static` mode shows the galaxy.
+- `patches/swaylock-plugin-ascii-indicator.patch` changes two things:
+  - `render.c`: with `SWAYLOCK_ASCII=1` the ring is drawn as a text box. All states are kept
+    and use the ring's colour options:
+
+    | Part | Colour option |
+    |---|---|
+    | box | inside |
+    | frame | ring |
+    | dots | line |
+    | message | text |
+
+    A key press lights three dots at a random place, as the ring does, so the password
+    length does not show. The box also shows these messages:
+    - `cleared`
+    - `verifying ...`
+    - `wrong`
+    - `caps lock`
+    - `N failed`
+    - the keyboard layout as `[cz]` in the top edge, when there are several layouts
+  - `forward.c`: swaylock-plugin drew the indicator only after the first key press, even
+    with `--indicator-idle-visible`. It now draws it as soon as the background arrives.
+- Colours come from the active palette:
+
+  | Role | Used for |
+  |---|---|
+  | `FADE` | normal frame, dots and text |
+  | `ACCENT` | key presses, verifying |
+  | `URGENT` | wrong, backspace |
+  | `WARN` | cleared, caps lock |
+  | `TERM_BG` | box, 96 % opaque |
+
+  The font comes from `wallpaper.conf`.
+
+### Safety
+
+- **Fallback to swaylock.** If swaylock-plugin, windowtolayer or kitty is missing,
+  `lock-wallpaper` runs plain `swaylock -f`. If swaylock-plugin crashes, sway keeps the
+  session locked, and `swaylock` takes over the lock.
+- **Background failures.** If the background program dies, swaylock-plugin keeps the lock
+  on a plain colour.
+- **Repeated presses.** A second `Mod4+x` while locked does nothing.
+- **Test mode.** `--test N` sends SIGUSR1, which makes swaylock-plugin unlock cleanly and exit.
+  The timer is a separate process.
+- **PAM.** `modules/lock-screen.sh` installs `/etc/pam.d/swaylock-plugin`. Without it, PAM
+  uses `/etc/pam.d/other`, which on Ubuntu checks the password like a normal login.
+- **Updates.** The two programs are built from source, so they get no updates from apt. To
+  update, change `SWAYLOCK_PLUGIN_REV` / `WINDOWTOLAYER_REV` in `modules/lock-screen.sh`
+  (and refresh the patch if it no longer applies), then run `bash modules/lock-screen.sh`.
+
+### Building
+
+`modules/lock-screen.sh` does all of this. Sources go to `~/.local/src`, binaries to
+`~/.local/bin`.
+
+- **Build dependencies:** git, meson, ninja-build, pkg-config, gcc, libwayland-dev,
+  libxkbcommon-dev, libcairo2-dev, libpam0g-dev, and Rust 1.80 or newer (from rustup;
+  Ubuntu's cargo is 1.75).
+- **wayland-protocols:** swaylock-plugin needs 1.47 or newer. Ubuntu 24.04 has 1.45, so tag
+  1.50 is cloned as a meson subproject. Its tests are turned off because they need a newer
+  wayland-scanner (`-Dwayland-protocols:tests=false`).
+- **Cost:** about 4–5 % of one core while locked (measured in a headless sway). That is about
+  the same as the wallpaper.
+
 ## Troubleshooting
 
 | Symptom | Fix |
@@ -283,6 +379,8 @@ from source.
 | `theme: ... yazi flavor '...' not installed` | Run `modules/yazi.sh` or `ya pkg add yazi-rs/flavors:catppuccin-latte` (and the other flavors). |
 | `theme` fails with `wallpaper.conf missing` | Run `theme reapply`. |
 | An ascii.rest scene shows only the theme background | Check the node version (`node -v` must be at least 22.18). Look at `/run/user/$UID/wallpaper.log`. |
+| `Mod4+x` shows plain swaylock instead of the scene | `lock-wallpaper` found no `~/.local/bin/swaylock-plugin` or `windowtolayer`, so run `bash modules/lock-screen.sh`. |
+| Screen stays locked with no password prompt | Switch to a console (Ctrl+Alt+F3), log in and run `pkill -USR1 swaylock-plugin`. |
 | Waybar disappeared | Run `swaymsg exec 'waybar -b bar-0'`. |
 | Old colours in a terminal | foot has no live reload, so open a new window. zsh updates at the next prompt. |
 

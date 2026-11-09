@@ -172,6 +172,11 @@ case "${1:-}" in
   _rotate)
     while sleep $((ROTATE * 60)); do advance; restart; done
     exit ;;
+  _cmd)          # for lock-wallpaper: "<font size or ->\t<command>" of the first monitor's scene
+    sc=$(scene_for "$(mode)" 0); [[ $sc == static ]] && sc=galaxy
+    cmd=$(cmd_for "$sc") || cmd=$(cmd_for galaxy)
+    if [[ -f $PIECES/$sc.ts ]]; then printf '%s\t%s\n' "$PIECES_FONT" "$cmd"; else printf -- '-\t%s\n' "$cmd"; fi
+    exit ;;
   -h|--help)
     sed -n '2,/^set -euo/{/^#/s/^# \{0,1\}//p}' "$0"; exit ;;
   *)

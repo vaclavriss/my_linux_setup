@@ -1,0 +1,217 @@
+diff --git a/forward.c b/forward.c
+index b18e755..b7dd52f 100644
+--- a/forward.c
++++ b/forward.c
+@@ -573,8 +573,10 @@ static void nested_surface_commit(struct wl_client *client,
+ 	}
+ 
+ 	/* Finally, commit updates to corresponding upstream background surface */
++	bool first_buffer = false;
+ 	if (surface->committed.attachment) {
+ 		// permit subsurface drawing
++		first_buffer = !surface->sway_surface->has_buffer;
+ 		surface->sway_surface->has_buffer = true;
+ 	}
+ 
+@@ -597,6 +599,12 @@ static void nested_surface_commit(struct wl_client *client,
+ 	}
+ 
+ 	wl_surface_commit(background->surface);
++
++	if (first_buffer) {
++		/* draw the indicator now (--indicator-idle-visible), not only after a key press */
++		sw_surf->dirty = true;
++		render(sw_surf);
++	}
+ }
+ 
+ static void nested_surface_set_buffer_transform(struct wl_client *client,
+diff --git a/render.c b/render.c
+index 27a0633..e8eb91d 100644
+--- a/render.c
++++ b/render.c
+@@ -1,6 +1,7 @@
+ #include <math.h>
+ #include <stdlib.h>
+ #include <stdio.h>
++#include <string.h>
+ #include <wayland-client.h>
+ #include "cairo.h"
+ #include "background-image.h"
+@@ -90,6 +91,164 @@ static void configure_font_drawing(cairo_t *cairo, struct swaylock_state *state,
+ 	cairo_font_options_destroy(fo);
+ }
+ 
++/*
++ * ASCII indicator (SWAYLOCK_ASCII=1): a text box instead of the ring, e.g.
++ *
++ *   +---------------------------[us]-+
++ *   |   . . . . . # # # . . . . . .   |
++ *   |          verifying ...           |
++ *   +---------------------------------+
++ *
++ * Same states and colours as the ring: the box is "inside", the frame "ring",
++ * the dots "line", the message "text"; a key press lights three random dots in
++ * key-hl (backspace: bs-hl), so the password length is not shown.
++ */
++#define ASCII_INNER 33
++#define ASCII_SLOTS 14
++
++static void ascii_put(cairo_t *cairo, double x0, double y0, double cw, double lh,
++		double ascent, int row, int col, const char *str) {
++	char ch[2] = {0, 0};
++	for (int i = 0; str[i]; i++) {
++		ch[0] = str[i];
++		cairo_move_to(cairo, x0 + (col + i) * cw, y0 + row * lh + ascent);
++		cairo_show_text(cairo, ch);
++	}
++	cairo_new_path(cairo);
++}
++
++static bool render_frame_ascii(struct swaylock_surface *surface, bool draw_indicator,
++		const char *text, const char *layout_text) {
++	struct swaylock_state *state = surface->state;
++	int scale = surface->scale;
++	double font_size = (state->args.font_size > 0 ? state->args.font_size : 20) * scale;
++
++	cairo_font_options_t *fo = cairo_font_options_create();
++	cairo_font_options_set_hint_style(fo, CAIRO_HINT_STYLE_FULL);
++	cairo_font_options_set_antialias(fo, CAIRO_ANTIALIAS_GRAY);
++	cairo_t *tc = state->test_cairo;
++	cairo_set_font_options(tc, fo);
++	cairo_select_font_face(tc, state->args.font, CAIRO_FONT_SLANT_NORMAL,
++		CAIRO_FONT_WEIGHT_NORMAL);
++	cairo_set_font_size(tc, font_size);
++	cairo_text_extents_t te;
++	cairo_font_extents_t fe;
++	cairo_text_extents(tc, "M", &te);
++	cairo_font_extents(tc, &fe);
++	double cw = te.x_advance, lh = fe.height, pad = cw;
++
++	int cols = ASCII_INNER + 2, rows = 4;
++	int buffer_width = cols * cw + 2 * pad;
++	int buffer_height = rows * lh + 2 * pad;
++	buffer_height += scale - (buffer_height % scale);
++	buffer_width += scale - (buffer_width % scale);
++
++	int subsurf_xpos = (state->args.override_indicator_x_position ?
++		state->args.indicator_x_position : surface->width / 2) - buffer_width / (2 * scale);
++	int subsurf_ypos = (state->args.override_indicator_y_position ?
++		state->args.indicator_y_position : surface->height / 2) - buffer_height / (2 * scale);
++
++	struct pool_buffer *buffer = get_next_buffer(state->shm,
++			surface->indicator_buffers, buffer_width, buffer_height);
++	if (buffer == NULL) {
++		swaylock_log(LOG_ERROR, "No buffer");
++		cairo_font_options_destroy(fo);
++		return false;
++	}
++	cairo_t *cairo = buffer->cairo;
++	cairo_identity_matrix(cairo);
++	cairo_save(cairo);
++	cairo_set_source_rgba(cairo, 0, 0, 0, 0);
++	cairo_set_operator(cairo, CAIRO_OPERATOR_SOURCE);
++	cairo_paint(cairo);
++	cairo_restore(cairo);
++
++	if (draw_indicator) {
++		cairo_set_font_options(cairo, fo);
++		cairo_select_font_face(cairo, state->args.font, CAIRO_FONT_SLANT_NORMAL,
++			CAIRO_FONT_WEIGHT_NORMAL);
++		cairo_set_font_size(cairo, font_size);
++		double x0 = pad, y0 = pad, asc = fe.ascent;
++
++		// box
++		cairo_rectangle(cairo, 0, 0, buffer_width, buffer_height);
++		set_color_for_state(cairo, state, &state->args.colors.inside);
++		cairo_fill(cairo);
++
++		// frame, keyboard layout in the top edge
++		char edge[ASCII_INNER + 3];
++		memset(edge, '-', cols);
++		edge[0] = edge[cols - 1] = '+';
++		edge[cols] = 0;
++		set_color_for_state(cairo, state, &state->args.colors.ring);
++		ascii_put(cairo, x0, y0, cw, lh, asc, 0, 0, edge);
++		ascii_put(cairo, x0, y0, cw, lh, asc, 3, 0, edge);
++		for (int r = 1; r <= 2; r++) {
++			ascii_put(cairo, x0, y0, cw, lh, asc, r, 0, "|");
++			ascii_put(cairo, x0, y0, cw, lh, asc, r, cols - 1, "|");
++		}
++		if (layout_text) {
++			char tag[16];
++			snprintf(tag, sizeof(tag), "[%.10s]", layout_text);
++			cairo_set_source_u32(cairo, state->args.colors.layout_text);
++			ascii_put(cairo, x0, y0, cw, lh, asc, 0, cols - 2 - (int)strlen(tag), tag);
++		}
++
++		// typing track: dots, three of them lit on a key press
++		int lit = -1;
++		if (state->input_state == INPUT_STATE_LETTER ||
++				state->input_state == INPUT_STATE_BACKSPACE) {
++			lit = state->highlight_start * ASCII_SLOTS / 2048;
++		}
++		int track_col = 1 + (ASCII_INNER - (2 * ASCII_SLOTS - 1)) / 2;
++		for (int i = 0; i < ASCII_SLOTS; i++) {
++			bool on = lit >= 0 && (i - lit + ASCII_SLOTS) % ASCII_SLOTS < 3;
++			if (on) {
++				bool caps = state->xkb.caps_lock && state->args.show_caps_lock_indicator;
++				if (state->input_state == INPUT_STATE_LETTER) {
++					cairo_set_source_u32(cairo, caps ?
++						state->args.colors.caps_lock_key_highlight :
++						state->args.colors.key_highlight);
++				} else {
++					cairo_set_source_u32(cairo, caps ?
++						state->args.colors.caps_lock_bs_highlight :
++						state->args.colors.bs_highlight);
++				}
++			} else {
++				set_color_for_state(cairo, state, &state->args.colors.line);
++			}
++			ascii_put(cairo, x0, y0, cw, lh, asc, 1, track_col + 2 * i, on ? "#" : ".");
++		}
++
++		// message
++		char msg[ASCII_INNER + 1];
++		const char *m = text ? text : "password";
++		int n = 0;
++		for (; m[n] && n < ASCII_INNER - 2; n++) {
++			msg[n] = (m[n] >= 'A' && m[n] <= 'Z') ? m[n] - 'A' + 'a' : m[n];
++		}
++		msg[n] = 0;
++		if (text && text[0] >= '0' && text[0] <= '9' && n + 7 < ASCII_INNER - 2) {
++			strcat(msg, " failed");   // failed attempts
++			n += 7;
++		}
++		if (state->auth_state == AUTH_STATE_VALIDATING && n + 4 < ASCII_INNER - 2) {
++			strcat(msg, " ...");
++			n += 4;
++		}
++		set_color_for_state(cairo, state, &state->args.colors.text);
++		ascii_put(cairo, x0, y0, cw, lh, asc, 2, 1 + (ASCII_INNER - n) / 2, msg);
++	}
++	cairo_font_options_destroy(fo);
++
++	wl_subsurface_set_position(surface->subsurface, subsurf_xpos, subsurf_ypos);
++	wl_surface_set_buffer_scale(surface->child, surface->scale);
++	wl_surface_attach(surface->child, buffer->buffer, 0, 0);
++	wl_surface_damage_buffer(surface->child, 0, 0, INT32_MAX, INT32_MAX);
++	wl_surface_commit(surface->child);
++	return true;
++}
++
+ static bool render_frame(struct swaylock_surface *surface) {
+ 	struct swaylock_state *state = surface->state;
+ 
+@@ -146,6 +305,11 @@ static bool render_frame(struct swaylock_surface *surface) {
+ 		}
+ 	}
+ 
++	const char *ascii = getenv("SWAYLOCK_ASCII");
++	if (ascii && ascii[0] == '1') {
++		return render_frame_ascii(surface, draw_indicator, text, layout_text);
++	}
++
+ 	// Compute the size of the buffer needed
+ 	int arc_radius = state->args.radius * surface->scale;
+ 	int arc_thickness = state->args.thickness * surface->scale;

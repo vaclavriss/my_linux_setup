@@ -6,8 +6,9 @@ Useful tools that accelerates me to be more effective.
 | Path | Contents |
 |---|---|
 | `install.sh` | runs the modules below in order |
-| `modules/` | `basic` → `zsh` → `pet` → `nvim` → `git-tmux` → `sway-waybar-wofi` → `yazi` → `theme-wallpaper` → `utils` |
+| `modules/` | `basic` → `zsh` → `pet` → `nvim` → `git-tmux` → `sway-waybar-wofi` → `yazi` → `theme-wallpaper` → `lock-screen` → `utils` |
 | `dot_files/` | configs, installed to `~` (`.config/` → `~/.config/`, `local/bin/` → `~/.local/bin/`) |
+| `patches/` | local changes to programs built from source (swaylock-plugin) |
 | `docs/` | how things work and how to set them up again |
 | `backups/` | original configs from before larger changes, for restoring the old look |
 | `pet/` | pet binary |
@@ -23,13 +24,15 @@ A single module can also be run on its own, for example `bash modules/theme-wall
 
 ## Colour themes and animated wallpaper
 
-Two commands drive the look:
+These commands drive the look:
 
 - `theme <palette>` switches the colours of sway, waybar, tmux, foot, wofi, zsh/p10k, yazi
   and nvim at once.
 - `wallpaper` runs calm ASCII scenes, colour-matched to the palette, behind a translucent
   foot: bonsai, forest animals, planets and meteors, night sky over mountains, aquarium,
   a rotating galaxy (in several `galaxy-*` variants), and eight full-colour ascii.rest scenes drawn as coloured ASCII.
+- `lock-wallpaper` (Mod4+x) locks the screen with the same scene animated behind the lock and
+  an ASCII password box in the palette's colours.
 
 See [docs/theme-and-wallpaper.md](docs/theme-and-wallpaper.md).
 

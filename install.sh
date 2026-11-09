@@ -83,6 +83,15 @@ else
 	echo "Skipping missing module: theme-wallpaper.sh" >&2
 fi
 
+# Lock screen with the wallpaper scene (Mod4+x); needs kitty and `wallpaper` from above
+if [[ -r "$MODULE_DIR/lock-screen.sh" ]]; then
+	echo "---- Running module: lock-screen.sh ----"
+	# shellcheck source=/dev/null
+	source "$MODULE_DIR/lock-screen.sh"
+else
+	echo "Skipping missing module: lock-screen.sh" >&2
+fi
+
 if [[ -r "$MODULE_DIR/utils.sh" ]]; then
 	echo "---- Running module: utils.sh ----"
 	# shellcheck source=/dev/null

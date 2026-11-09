@@ -58,7 +58,9 @@ exec ~/.local/bin/wallpaper
 
 # bindsym Mod4+x exec swaylock -f -c 000000
 
-bindsym Mod4+x exec ~/.local/bin/lock-blur.sh
+# bindsym Mod4+x exec ~/.local/bin/lock-blur.sh
+# wallpaper scene behind the lock, ASCII password box (falls back to swaylock); test: lock-wallpaper --test 20
+bindsym Mod4+x exec ~/.local/bin/lock-wallpaper
 
 # This will lock your screen after 300 seconds of inactivity, then turn off
 # your displays after another 300 seconds, and turn your screens back on when
@@ -258,6 +260,8 @@ bindsym $mod+p exec grim -g "$(slurp)" - | wl-copy
 bindsym $mod+Shift+s exec systemctl suspend
 # Open terminal together with yazi
 bindsym $mod+q exec env AUTO_YAZI=1 $term
+# 
+bindsym --locked XF86AudioMicMute exec wpctl set-mute @DEFAULT_AUDIO_SOURCE@ toggle
 
 include /etc/sway/config.d/*
 
