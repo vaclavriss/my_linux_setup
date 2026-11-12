@@ -26,6 +26,7 @@
 #   YAZI_FLAVOR* base yazi flavor under the palette colours (default: claude-inspired,
 #               catppuccin-latte for light palettes)
 #   NVIM_NATIVE* 1 = use catppuccin as is, without palette overrides (default: 0)
+#   PAIR*       light/dark counterpart for `theme toggle` (default: <name>-light / <name>)
 UI_BG="#607b8f"
 UI_FG="#f7e396"
 ACCENT="#e97f4a"

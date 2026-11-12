@@ -4,7 +4,7 @@
 #   theme               show the active palette
 #   theme list          list palettes (* = active)
 #   theme <name>        apply ~/.config/themes/palettes/<name>.sh and reload everything
-#   theme toggle        switch between <name> and <name>-light
+#   theme toggle        switch to the light/dark pair (PAIR=, or <name> <-> <name>-light)
 #   theme reapply       regenerate files from the active palette (after editing it)
 #   theme yazi-icons    re-extract yazi's built-in icon glyphs (after a yazi upgrade)
 #
@@ -56,8 +56,11 @@ case "${1:-}" in
     exit ;;
   toggle)
     cur=$(current)
-    if [[ $cur == *-light ]]; then name=${cur%-light}
-    else name=$cur-light; fi
+    # PAIR= in the palette names its counterpart, otherwise <name> <-> <name>-light
+    name=$(sed -n 's/^PAIR="\{0,1\}\([^" ]*\).*/\1/p' "$PALETTES/$cur.sh" 2>/dev/null)
+    if [[ -z $name ]]; then
+      if [[ $cur == *-light ]]; then name=${cur%-light}; else name=$cur-light; fi
+    fi
     [[ -f $PALETTES/$name.sh ]] || die "no light/dark pair for '$cur' (missing $name.sh)" ;;
   reapply)
     name=$(current) ;;
@@ -398,6 +401,9 @@ else
       "$(mix "$TERM_BG" "$TERM_FG" 40)" "$H_RED" "$H_GREEN" "$H_YELLOW" "$H_BLUE" "$H_MAGENTA" "$H_CYAN" "$TERM_FG")
 fi
 wp[0]=$TERM_BG
+# light palettes: their bright black is dark grey (readable text), which makes the forest
+# hills a heavy slab; on the wallpaper it becomes a soft shade of the background
+(( ${#ANSI[@]} )) && is_light && wp[8]=$(mix "$TERM_BG" "${ANSI[8]}" 40)
 {
   echo "# $header"
   echo "font_family MesloLGS NF"

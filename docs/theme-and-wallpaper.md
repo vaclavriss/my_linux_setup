@@ -13,7 +13,7 @@ kitty 0.50, yazi 26.9, neovim + catppuccin).
 theme                 # show the active palette
 theme list            # list palettes (* = active)
 theme crimson         # apply a palette and reload everything that is running
-theme toggle          # <name> <-> <name>-light   (zsh alias: sm)
+theme toggle          # light <-> dark: PAIR=, or <name> <-> <name>-light   (zsh alias: sm)
 theme reapply         # regenerate after editing the active palette
 theme yazi-icons      # re-extract yazi's icon glyphs (after a yazi upgrade)
 
@@ -128,6 +128,7 @@ Palettes shipped:
 | `forest` | greens | forest night bonsai aquarium |
 | `crimson` | dark red pills, mint text (old waybar dark.css + old sway colours) | space night bonsai |
 | `catppuccin-mocha` | catppuccin, nvim/yazi native | space night aquarium forest bonsai |
+| `catppuccin-latte` | light catppuccin, nvim/yazi native; `theme toggle` pairs it with mocha | forest aquarium bonsai |
 | `gruvbox-dark` | gruvbox with full ANSI set | forest bonsai night aquarium |
 
 ### Adding a palette
@@ -139,6 +140,8 @@ To add a palette:
 3. Run `theme <name>`.
 
 If you add `<name>-light.sh`, `theme toggle` switches between the two variants.
+Palettes with other names point at each other with `PAIR=` (as `catppuccin-mocha` and
+`catppuccin-latte` do).
 
 ## Wallpaper internals
 
@@ -155,7 +158,8 @@ If you add `<name>-light.sh`, `theme toggle` switches between the two variants.
   matches unrelated shells.
 - **Colours:** kitty uses `~/.config/kitty/wallpaper.conf`, with font size 18 and the
   palette's ANSI colours or its HUES. Colour 0 is the terminal background, so the scenes
-  blend in. `SCENE_LIGHT=1` is passed for light palettes.
+  blend in. In light palettes with ANSI colours, colour 8 is lightened
+  towards the background, so the forest hills stay a soft shade. `SCENE_LIGHT=1` is passed for light palettes.
 - **Cost:** a custom scene uses about 0.15–0.5 % of one core and about 15 MB.
   - kitty plus two scenes: about 0.5–0.7 % CPU.
   - asciiquarium: about 17 %.

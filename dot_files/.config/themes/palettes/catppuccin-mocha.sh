@@ -18,6 +18,7 @@ UI_BG2="#45475a"
 CMD_FG="#89b4fa"
 NVIM_NATIVE=1                # nvim: plain catppuccin-mocha, no overrides
 YAZI_FLAVOR="catppuccin-mocha"
+PAIR="catppuccin-latte"      # `theme toggle` switches to this palette
 # icon / file-type colours: red orange yellow green cyan blue magenta
 HUES=("#f38ba8" "#fab387" "#f9e2af" "#a6e3a1" "#94e2d5" "#89b4fa" "#cba6f7")
 # wallpaper scenes (see: wallpaper list), one per monitor, rotating
